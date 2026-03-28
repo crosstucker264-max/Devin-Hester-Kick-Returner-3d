@@ -66,7 +66,7 @@ func _make_player_mesh(color: Color) -> MeshInstance3D:
 func _create_player():
 	# Returner — red, at the 10 yard line (back of field)
 	player = CharacterBody3D.new()
-	player.position = Vector3(-1, ground_y, 30)  # returner at 10 yard line, center field
+	player.position = Vector3(-10, ground_y, 22)  # returner at 10 yard line, center field
 
 	var col = CollisionShape3D.new()
 	var shape = CapsuleShape3D.new()
@@ -80,10 +80,10 @@ func _create_player():
 func _create_other_players():
 	# Coverage team (blue) — spread across the 40-50 yard line area
 	var coverage_positions = [
-		Vector3(-21, ground_y, -35), Vector3(-14, ground_y, -35), Vector3(-7,  ground_y, -35),
-		Vector3(-1,  ground_y, -35), Vector3(6,   ground_y, -35), Vector3(13,  ground_y, -35),
-		Vector3(20,  ground_y, -35), Vector3(-18, ground_y, -45), Vector3(-1,  ground_y, -45),
-		Vector3(16,  ground_y, -45), Vector3(-1,  ground_y, -55)
+		Vector3(-30, ground_y, -32), Vector3(-23, ground_y, -32), Vector3(-16, ground_y, -32),
+		Vector3(-10, ground_y, -32), Vector3(-3,  ground_y, -32), Vector3(4,   ground_y, -32),
+		Vector3(11,  ground_y, -32), Vector3(-24, ground_y, -40), Vector3(-10, ground_y, -40),
+		Vector3(4,   ground_y, -40), Vector3(-10, ground_y, -48)
 	]
 	for pos in coverage_positions:
 		var p = StaticBody3D.new()
@@ -93,10 +93,10 @@ func _create_other_players():
 
 	# Blockers (white) — spread between returner and coverage
 	var blocker_positions = [
-		Vector3(-21, ground_y, 10), Vector3(-14, ground_y, 10), Vector3(-7,  ground_y, 10),
-		Vector3(-1,  ground_y, 10), Vector3(6,   ground_y, 10), Vector3(13,  ground_y, 10),
-		Vector3(20,  ground_y, 10), Vector3(-14, ground_y, 18), Vector3(6,   ground_y, 18),
-		Vector3(-1,  ground_y, 18)
+		Vector3(-30, ground_y, 3),  Vector3(-23, ground_y, 3),  Vector3(-16, ground_y, 3),
+		Vector3(-10, ground_y, 3),  Vector3(-3,  ground_y, 3),  Vector3(4,   ground_y, 3),
+		Vector3(11,  ground_y, 3),  Vector3(-23, ground_y, 10), Vector3(4,   ground_y, 10),
+		Vector3(-10, ground_y, 10)
 	]
 	for pos in blocker_positions:
 		var p = StaticBody3D.new()
