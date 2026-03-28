@@ -146,10 +146,10 @@ func _physics_process(delta):
 	player.velocity = dir * speed
 	player.move_and_slide()
 
-	# Camera locked behind and above returner, always centered on him
-	var cam_offset = Vector3(0, 6, 12)
+	# Camera locked directly behind and above returner, centered on him
+	var cam_offset = Vector3(0, 8, 15)
 	camera.position = player.position + cam_offset
-	camera.look_at(player.position + Vector3(0, 0, -10), Vector3.UP)
+	camera.look_at(player.position, Vector3.UP)
 
 	# Show position on screen
 	var p = player.position
