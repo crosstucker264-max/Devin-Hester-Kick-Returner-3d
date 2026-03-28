@@ -67,7 +67,7 @@ func _make_player_mesh(color: Color) -> MeshInstance3D:
 func _create_player():
 	# Returner — red, at the 10 yard line (back of field)
 	player = CharacterBody3D.new()
-	player.position = Vector3(-10.5, ground_y, 22)  # returner at 10 yard line, center field
+	player.position = Vector3(-0.5, ground_y, 28)  # returner start position
 
 	var col = CollisionShape3D.new()
 	var shape = CapsuleShape3D.new()
@@ -155,14 +155,6 @@ func _physics_process(delta):
 	if Input.is_action_pressed("ui_right"):
 		dir += cam_right
 
-	# Camera adjustment controls (slow and smooth)
-	if Input.is_key_pressed(KEY_W): cam_height += 0.05
-	if Input.is_key_pressed(KEY_S): cam_height -= 0.05
-	if Input.is_key_pressed(KEY_Q): cam_dist -= 0.05
-	if Input.is_key_pressed(KEY_E): cam_dist += 0.05
-	if Input.is_key_pressed(KEY_A): cam_side -= 0.05
-	if Input.is_key_pressed(KEY_D): cam_side += 0.05
-
 	# Camera sits at fixed offset behind player — no rotation, no feedback loop
 	camera.position = player.position + Vector3(cam_side, cam_height, cam_dist)
 	camera.look_at(player.position + Vector3(0, 1, 0), Vector3.UP)
@@ -173,4 +165,4 @@ func _physics_process(delta):
 
 	# Show position and camera info on screen
 	var p = player.position
-	label.text = "X: %.1f  Y: %.1f  Z: %.1f\nCam Height: %.1f  Dist: %.1f  Side: %.1f\nW/S=up/down  Q/E=closer/further  A/D=left/right\nArrow keys = move player" % [p.x, p.y, p.z, cam_height, cam_dist, cam_side]
+	label.text = "X: %.1f  Y: %.1f  Z: %.1f\nArrow keys = move player" % [p.x, p.y, p.z]
