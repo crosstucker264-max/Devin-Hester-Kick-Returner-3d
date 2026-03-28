@@ -4,9 +4,9 @@ var player
 var camera
 var speed = 10.0
 var label
-var cam_height = 8.0
-var cam_dist = 15.0
-var cam_side = 0.0
+var cam_height = 5.2
+var cam_dist = 9.7
+var cam_side = 2.5
 var player_facing = Vector3(0, 0, 1)
 
 # Field center offset — adjust if stadium model is off center
