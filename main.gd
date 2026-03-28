@@ -4,6 +4,8 @@ var player
 var camera
 var speed = 10.0
 var label
+var cam_height = 8.0
+var cam_dist = 15.0
 
 # Field center offset — adjust if stadium model is off center
 var field_center = Vector3(0, 0, 0)
@@ -146,11 +148,17 @@ func _physics_process(delta):
 	player.velocity = dir * speed
 	player.move_and_slide()
 
+	# Camera height and distance controls
+	if Input.is_key_pressed(KEY_W): cam_height += 0.1
+	if Input.is_key_pressed(KEY_S): cam_height -= 0.1
+	if Input.is_key_pressed(KEY_Q): cam_dist -= 0.1
+	if Input.is_key_pressed(KEY_E): cam_dist += 0.1
+
 	# Camera locked directly behind and above returner, centered on him
-	var cam_offset = Vector3(0, 8, 15)
+	var cam_offset = Vector3(0, cam_height, cam_dist)
 	camera.position = player.position + cam_offset
 	camera.look_at(player.position, Vector3.UP)
 
-	# Show position on screen
+	# Show position and camera info on screen
 	var p = player.position
-	label.text = "X: %.1f  Y: %.1f  Z: %.1f\nUse arrow keys to move\nTell Claude these numbers!" % [p.x, p.y, p.z]
+	label.text = "X: %.1f  Y: %.1f  Z: %.1f\nCam Height: %.1f  Cam Dist: %.1f\nW/S = camera up/down  Q/E = closer/further\nArrow keys = move player" % [p.x, p.y, p.z, cam_height, cam_dist]
