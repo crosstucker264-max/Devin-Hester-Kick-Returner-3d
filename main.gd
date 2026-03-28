@@ -79,29 +79,25 @@ func _create_player():
 	add_child(player)
 
 func _create_other_players():
-	# Coverage team (blue) — spread across the 40-50 yard line area
-	var coverage_positions = [
-		Vector3(-21, ground_y, -26), Vector3(-14, ground_y, -26), Vector3(-7, ground_y, -26),
-		Vector3(-0.5, ground_y, -26), Vector3(6, ground_y, -26), Vector3(13, ground_y, -26),
-		Vector3(20,  ground_y, -26), Vector3(-14, ground_y, -36), Vector3(-0.5, ground_y, -36),
-		Vector3(13,  ground_y, -36), Vector3(-0.5, ground_y, -44)
-	]
-	for pos in coverage_positions:
+	# Coverage team (blue) — 10 players in one straight line, evenly across field
+	var coverage_x = [-22.0, -17.0, -12.0, -7.0, -2.0, 3.0, 8.0, 13.0, 18.0, 23.0]
+	for x in coverage_x:
 		var p = StaticBody3D.new()
-		p.position = pos
+		p.position = Vector3(x, ground_y, -18)
 		p.add_child(_make_player_mesh(Color(0.1, 0.2, 0.8)))
 		add_child(p)
 
-	# Blockers (white) — spread between returner and coverage
-	var blocker_positions = [
-		Vector3(-21, ground_y, 9),  Vector3(-14, ground_y, 9),  Vector3(-7, ground_y, 9),
-		Vector3(-0.5, ground_y, 9), Vector3(6,   ground_y, 9),  Vector3(13,  ground_y, 9),
-		Vector3(20,  ground_y, 9),  Vector3(-14, ground_y, 18), Vector3(13,  ground_y, 18),
-		Vector3(-0.5, ground_y, 18)
-	]
-	for pos in blocker_positions:
+	# Kicker (blue) — alone, further back behind the coverage line
+	var kicker = StaticBody3D.new()
+	kicker.position = Vector3(-0.5, ground_y, -40)
+	kicker.add_child(_make_player_mesh(Color(0.1, 0.2, 0.8)))
+	add_child(kicker)
+
+	# Blockers (white) — 10 players in one straight line ahead of returner
+	var blocker_x = [-22.0, -17.0, -12.0, -7.0, -2.0, 3.0, 8.0, 13.0, 18.0, 23.0]
+	for x in blocker_x:
 		var p = StaticBody3D.new()
-		p.position = pos
+		p.position = Vector3(x, ground_y, 10)
 		p.add_child(_make_player_mesh(Color(0.9, 0.9, 0.9)))
 		add_child(p)
 
