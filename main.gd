@@ -7,11 +7,16 @@ var label
 var cam_height = 5.2
 var cam_dist = 9.7
 var cam_side = 2.5
-var player_facing = Vector3(0, 0, 1)
 
-# Field center offset — adjust if stadium model is off center
-var field_center = Vector3(0, 0, 0)
-var ground_y = -10.4  # adjust this until players sit on the field
+var ground_y = -10.4
+
+var game_started = false
+var coverage_players = []
+var coverage_speed = 7.0
+
+# Field direction vectors (computed once at start)
+var field_fwd = Vector3.ZERO
+var field_right = Vector3.ZERO
 
 func _ready():
 	_load_stadium()
@@ -26,7 +31,7 @@ func _create_label():
 	add_child(canvas)
 	label = Label.new()
 	label.position = Vector2(10, 10)
-	label.add_theme_font_size_override("font_size", 20)
+	label.add_theme_font_size_override("font_size", 24)
 	label.add_theme_color_override("font_color", Color(1, 1, 0))
 	canvas.add_child(label)
 
@@ -65,10 +70,8 @@ func _make_player_mesh(color: Color) -> MeshInstance3D:
 	return mesh
 
 func _create_player():
-	# Returner — red, at the 10 yard line (back of field)
 	player = CharacterBody3D.new()
-	player.position = Vector3(-0.5, ground_y, 28)  # returner start position
-
+	player.position = Vector3(-0.5, ground_y, 28)
 	var col = CollisionShape3D.new()
 	var shape = CapsuleShape3D.new()
 	shape.radius = 0.4
@@ -79,17 +82,15 @@ func _create_player():
 	add_child(player)
 
 func _create_other_players():
-	# Field runs diagonally in world space — compute real field directions
-	# Based on measured end zone positions: near (3,41) → far (-24,-65)
+	# Field runs diagonally — compute real field directions
 	var near_end = Vector3(3, 0, 41)
 	var far_end = Vector3(-24, 0, -65)
-	var field_fwd = (far_end - near_end).normalized()           # points upfield
-	var field_right = Vector3(-field_fwd.z, 0, field_fwd.x)   # points across field to the right
+	field_fwd = (far_end - near_end).normalized()
+	field_right = Vector3(-field_fwd.z, 0, field_fwd.x)
 
 	var returner_pos = Vector3(-0.5, ground_y, 28)
 
-	# Blockers (white) — NFL 2024 kickoff rules:
-	# 6 players on B35 restraining line (outside numbers, numbers to hashes, inside hashes x2 sides)
+	# 6 blockers (white) on B35 restraining line
 	var b35_center = returner_pos + field_fwd * 36
 	b35_center.y = ground_y
 	var b35_offsets = [-20.0, -11.0, -4.0, 4.0, 11.0, 20.0]
@@ -101,7 +102,7 @@ func _create_other_players():
 		p.add_child(_make_player_mesh(Color(0.9, 0.9, 0.9)))
 		add_child(p)
 
-	# 3 players in setup zone (B30-B35), one per zone (left, center, right)
+	# 3 blockers (white) in setup zone (B30-B35), one per zone
 	var setup_center = returner_pos + field_fwd * 32
 	setup_center.y = ground_y
 	var setup_offsets = [-13.0, 0.0, 13.0]
@@ -113,7 +114,7 @@ func _create_other_players():
 		p.add_child(_make_player_mesh(Color(0.9, 0.9, 0.9)))
 		add_child(p)
 
-	# Coverage (blue) — 10 players at the receiving team's 45-yard line
+	# 10 coverage players (blue) at B40 — stored so they can move after snap
 	var coverage_center = returner_pos + field_fwd * 41
 	coverage_center.y = ground_y
 	for i in range(10):
@@ -124,8 +125,9 @@ func _create_other_players():
 		p.position = pos
 		p.add_child(_make_player_mesh(Color(0.1, 0.2, 0.8)))
 		add_child(p)
+		coverage_players.append(p)
 
-	# Kicker (blue) — alone at center, at the kicking team's 35-yard line
+	# Kicker (blue) at A35
 	var kicker_pos = returner_pos + field_fwd * 63
 	kicker_pos.y = ground_y
 	var kicker = StaticBody3D.new()
@@ -164,9 +166,18 @@ func _create_lighting():
 	add_child(world_env)
 
 func _physics_process(delta):
-	var dir = Vector3.ZERO
+	# Update camera every frame regardless of game state
+	camera.position = player.position + Vector3(cam_side, cam_height, cam_dist)
+	camera.look_at(player.position + Vector3(0, 1, 0), Vector3.UP)
 
-	# Get camera forward and right directions (ignore Y axis)
+	if not game_started:
+		# Everyone frozen — wait for player to catch the ball
+		label.text = "Press SPACE to catch the ball!"
+		if Input.is_action_just_pressed("ui_accept"):
+			game_started = true
+		return
+
+	# Game active — move player with arrow keys
 	var cam_forward = -camera.global_transform.basis.z
 	var cam_right = camera.global_transform.basis.x
 	cam_forward.y = 0
@@ -174,23 +185,20 @@ func _physics_process(delta):
 	cam_forward = cam_forward.normalized()
 	cam_right = cam_right.normalized()
 
-	if Input.is_action_pressed("ui_up"):
-		dir += cam_forward
-	if Input.is_action_pressed("ui_down"):
-		dir -= cam_forward
-	if Input.is_action_pressed("ui_left"):
-		dir -= cam_right
-	if Input.is_action_pressed("ui_right"):
-		dir += cam_right
+	var dir = Vector3.ZERO
+	if Input.is_action_pressed("ui_up"):    dir += cam_forward
+	if Input.is_action_pressed("ui_down"):  dir -= cam_forward
+	if Input.is_action_pressed("ui_left"):  dir -= cam_right
+	if Input.is_action_pressed("ui_right"): dir += cam_right
 
-	# Camera sits at fixed offset behind player — no rotation, no feedback loop
-	camera.position = player.position + Vector3(cam_side, cam_height, cam_dist)
-	camera.look_at(player.position + Vector3(0, 1, 0), Vector3.UP)
-
-	# Player moves based on camera forward/right
 	player.velocity = dir * speed
 	player.move_and_slide()
 
-	# Show position and camera info on screen
-	var p = player.position
-	label.text = "X: %.1f  Y: %.1f  Z: %.1f\nArrow keys = move player" % [p.x, p.y, p.z]
+	# Coverage players run straight at the returner
+	for p in coverage_players:
+		var to_player = player.position - p.position
+		to_player.y = 0
+		if to_player.length() > 1.0:
+			p.position += to_player.normalized() * coverage_speed * delta
+
+	label.text = "Arrow keys = run!\nGet past the coverage!"
