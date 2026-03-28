@@ -12,17 +12,27 @@ var cam_height = 5.2
 var cam_dist = 9.7
 var cam_side = 2.5
 
-var base_speed = 6.0    # slightly under attackers (7.0)
+var base_speed = 6.0
 var sprint_speed = 10.0
 var stamina = 100.0
 var max_stamina = 100.0
-var stamina_drain = 35.0
-var stamina_regen = 18.0
-var exhausted = false   # can't sprint again until stamina recovers to 25
+var stamina_drain = 42.0        # drains fast — sprint is precious
+var stamina_regen = 16.0
+var exhausted = false
+
+# Juke and spin moves
+var juke_cooldown = 0.0
+var juke_max_cooldown = 1.8     # seconds between jukes
+var spin_cooldown = 0.0
+var spin_max_cooldown = 2.5     # seconds between spins
+var spin_invincible_timer = 0.0 # brief window can't be tackled during spin
+var move_recovery_timer = 0.0   # short slow after juke/spin
+var JUKE_DIST = 1.83            # ~2 yards in world units
+var SPIN_DIST = 1.5             # forward push during spin
 
 # Defense stamina — invisible, lasts 20% longer, empty = 30% speed penalty
-var def_drain_rate = 35.0 / 1.2   # ~29.2/sec
-var def_regen_rate = 15.0         # regens slowly when blocked/resting
+var def_drain_rate = 35.0 / 1.2
+var def_regen_rate = 15.0
 var kicker_stamina = 100.0
 
 var ground_y = -10.4
@@ -271,7 +281,8 @@ func _create_other_players():
 		p.position = pos
 		p.add_child(_make_player_mesh(Color(0.1, 0.2, 0.8)))
 		add_child(p)
-		var spd = coverage_speed + 1.5 if abs(offset) >= 18.0 else coverage_speed
+		# Gunners (outer) fastest; inner players slightly faster to cut off gaps
+		var spd = coverage_speed + 1.5 if abs(offset) >= 18.0 else (coverage_speed + 0.5 if abs(offset) <= 3.0 else coverage_speed)
 		coverage_data.append({
 			"body": p,
 			"lane_offset": offset,
@@ -364,6 +375,31 @@ func _physics_process(delta):
 		cam_forward = cam_forward.normalized()
 		cam_right_vec = cam_right_vec.normalized()
 
+		# Tick cooldowns
+		juke_cooldown = max(juke_cooldown - delta, 0.0)
+		spin_cooldown = max(spin_cooldown - delta, 0.0)
+		spin_invincible_timer = max(spin_invincible_timer - delta, 0.0)
+		move_recovery_timer = max(move_recovery_timer - delta, 0.0)
+
+		# Juke left (Z) — 2-yard lateral dash left
+		if Input.is_key_pressed(KEY_Z) and juke_cooldown == 0.0:
+			player.position -= field_right * JUKE_DIST
+			juke_cooldown = juke_max_cooldown
+			move_recovery_timer = 0.35
+
+		# Juke right (X) — 2-yard lateral dash right
+		if Input.is_key_pressed(KEY_X) and juke_cooldown == 0.0:
+			player.position += field_right * JUKE_DIST
+			juke_cooldown = juke_max_cooldown
+			move_recovery_timer = 0.35
+
+		# Spin move (C) — forward burst + brief tackle invincibility
+		if Input.is_key_pressed(KEY_C) and spin_cooldown == 0.0:
+			player.position += field_fwd * SPIN_DIST * -1  # push toward scoring end zone
+			spin_cooldown = spin_max_cooldown
+			spin_invincible_timer = 0.45
+			move_recovery_timer = 0.2
+
 		var dir = Vector3.ZERO
 		if Input.is_action_pressed("ui_up"):    dir += cam_forward
 		if Input.is_action_pressed("ui_down"):  dir -= cam_forward
@@ -381,19 +417,21 @@ func _physics_process(delta):
 			if exhausted and stamina >= 25.0:
 				exhausted = false
 
+		# Recovery after juke/spin reduces speed briefly
+		var recovery_mult = 0.75 if move_recovery_timer > 0.0 else 1.0
 		var current_speed = sprint_speed if is_sprinting else base_speed
-		player.velocity = dir * current_speed
+		player.velocity = dir * current_speed * recovery_mult
 		player.move_and_slide()
 
-		# Update stamina bar fill and color
+		# Update stamina bar
 		var pct = stamina / max_stamina
 		stamina_bar_fill.size.x = 216.0 * pct
 		if pct > 0.5:
-			stamina_bar_fill.color = Color(0.1, 0.9, 0.1)       # green
+			stamina_bar_fill.color = Color(0.1, 0.9, 0.1)
 		elif pct > 0.25:
-			stamina_bar_fill.color = Color(0.95, 0.75, 0.1)     # yellow
+			stamina_bar_fill.color = Color(0.95, 0.75, 0.1)
 		else:
-			stamina_bar_fill.color = Color(0.9, 0.1, 0.1)       # red
+			stamina_bar_fill.color = Color(0.9, 0.1, 0.1)
 
 		# Blockers run toward their assigned coverage player
 		for bdata in blocker_data:
@@ -433,13 +471,23 @@ func _physics_process(delta):
 			to_returner.y = 0
 			var dist = to_returner.length()
 
+			# Inner players (small lane offset) cut off angles — aim ahead of returner
+			var target_pos = player.position
+			if abs(cdata.lane_offset) <= 3.0 and not cdata.broke_free:
+				# Predict where returner will be and cut off the lane
+				target_pos = player.position + (player.velocity.normalized() * 3.0)
+				target_pos.y = p.position.y
+
+			var to_target = target_pos - p.position
+			to_target.y = 0
+
 			var blend = clamp(1.0 - dist / 20.0, 0.0, 1.0) if not cdata.broke_free else 1.0
-			var move_dir = (-field_fwd).lerp(to_returner.normalized(), blend).normalized()
+			var move_dir = (-field_fwd).lerp(to_target.normalized(), blend).normalized()
 
 			if dist > 1.0:
 				p.position += move_dir * effective_speed * delta
 
-			if dist < 1.5:
+			if dist < 1.5 and spin_invincible_timer <= 0.0:
 				_tackled()
 				return
 
@@ -450,7 +498,7 @@ func _physics_process(delta):
 		to_player_k.y = 0
 		if to_player_k.length() > 1.0:
 			kicker_body.position += to_player_k.normalized() * effective_kicker_speed * delta
-		elif to_player_k.length() < 1.5:
+		elif to_player_k.length() < 1.5 and spin_invincible_timer <= 0.0:
 			_tackled()
 			return
 
@@ -459,7 +507,7 @@ func _physics_process(delta):
 		if past_goal > 0:
 			_touchdown()
 
-		label.text = "Run to the BLUE end zone!\nArrow keys = move"
+		label.text = "Run to the BLUE end zone!\nShift=Sprint  Z=Juke Left  X=Juke Right  C=Spin"
 
 	elif game_phase == "touchdown" or game_phase == "tackled":
 		# Freeze everything — just hold the camera
