@@ -20,15 +20,13 @@ var stamina_drain = 42.0        # drains fast — sprint is precious
 var stamina_regen = 16.0
 var exhausted = false
 
-# Juke and spin moves
-var juke_cooldown = 0.0
-var juke_max_cooldown = 1.8     # seconds between jukes
-var spin_cooldown = 0.0
-var spin_max_cooldown = 2.5     # seconds between spins
-var spin_invincible_timer = 0.0 # brief window can't be tackled during spin
-var move_recovery_timer = 0.0   # short slow after juke/spin
-var JUKE_DIST = 1.83            # ~2 yards in world units
-var SPIN_DIST = 1.5             # forward push during spin
+# Juke and spin moves — cost stamina instead of cooldowns
+var spin_invincible_timer = 0.0
+var move_recovery_timer = 0.0
+var JUKE_DIST = 1.83            # ~2 yards
+var SPIN_DIST = 1.5
+var JUKE_COST = 22.0            # stamina cost per juke
+var SPIN_COST = 30.0            # stamina cost per spin
 
 # Defense stamina — invisible, lasts 20% longer, empty = 30% speed penalty
 var def_drain_rate = 35.0 / 1.2
@@ -375,30 +373,9 @@ func _physics_process(delta):
 		cam_forward = cam_forward.normalized()
 		cam_right_vec = cam_right_vec.normalized()
 
-		# Tick cooldowns
-		juke_cooldown = max(juke_cooldown - delta, 0.0)
-		spin_cooldown = max(spin_cooldown - delta, 0.0)
+		# Tick effect timers
 		spin_invincible_timer = max(spin_invincible_timer - delta, 0.0)
 		move_recovery_timer = max(move_recovery_timer - delta, 0.0)
-
-		# Juke left (Z) — 2-yard lateral dash left
-		if Input.is_key_pressed(KEY_Z) and juke_cooldown == 0.0:
-			player.position -= field_right * JUKE_DIST
-			juke_cooldown = juke_max_cooldown
-			move_recovery_timer = 0.35
-
-		# Juke right (X) — 2-yard lateral dash right
-		if Input.is_key_pressed(KEY_X) and juke_cooldown == 0.0:
-			player.position += field_right * JUKE_DIST
-			juke_cooldown = juke_max_cooldown
-			move_recovery_timer = 0.35
-
-		# Spin move (C) — forward burst + brief tackle invincibility
-		if Input.is_key_pressed(KEY_C) and spin_cooldown == 0.0:
-			player.position += field_fwd * SPIN_DIST * -1  # push toward scoring end zone
-			spin_cooldown = spin_max_cooldown
-			spin_invincible_timer = 0.45
-			move_recovery_timer = 0.2
 
 		var dir = Vector3.ZERO
 		if Input.is_action_pressed("ui_up"):    dir += cam_forward
@@ -513,6 +490,29 @@ func _physics_process(delta):
 		# Freeze everything — just hold the camera
 		camera.position = player.position + Vector3(cam_side, cam_height, cam_dist)
 		camera.look_at(player.position + Vector3(0, 1, 0), Vector3.UP)
+
+func _input(event):
+	if game_phase != "active":
+		return
+	if not (event is InputEventKey and event.pressed and not event.echo):
+		return
+	match event.keycode:
+		KEY_Z:
+			if stamina >= JUKE_COST:
+				player.position -= field_right * JUKE_DIST
+				stamina -= JUKE_COST
+				move_recovery_timer = 0.35
+		KEY_X:
+			if stamina >= JUKE_COST:
+				player.position += field_right * JUKE_DIST
+				stamina -= JUKE_COST
+				move_recovery_timer = 0.35
+		KEY_C:
+			if stamina >= SPIN_COST:
+				player.position -= field_fwd * SPIN_DIST
+				stamina -= SPIN_COST
+				spin_invincible_timer = 0.45
+				move_recovery_timer = 0.2
 
 func _catch_ball():
 	game_phase = "active"
