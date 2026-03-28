@@ -79,27 +79,46 @@ func _create_player():
 	add_child(player)
 
 func _create_other_players():
-	# Coverage team (blue) — 10 players in one straight line, evenly across field
-	var coverage_x = [-22.0, -17.0, -12.0, -7.0, -2.0, 3.0, 8.0, 13.0, 18.0, 23.0]
-	for x in coverage_x:
+	# Field runs diagonally in world space — compute real field directions
+	# Based on measured end zone positions: near (3,41) → far (-24,-65)
+	var near_end = Vector3(3, 0, 41)
+	var far_end = Vector3(-24, 0, -65)
+	var field_fwd = (far_end - near_end).normalized()           # points upfield
+	var field_right = Vector3(-field_fwd.z, 0, field_fwd.x)   # points across field to the right
+
+	var returner_pos = Vector3(-0.5, ground_y, 28)
+
+	# Blockers (white) — 10 players in a straight line 18 units upfield from returner
+	var blocker_center = returner_pos + field_fwd * 18
+	blocker_center.y = ground_y
+	for i in range(10):
+		var offset = (i - 4.5) * 4.5
+		var pos = blocker_center + field_right * offset
+		pos.y = ground_y
 		var p = StaticBody3D.new()
-		p.position = Vector3(x, ground_y, -18)
+		p.position = pos
+		p.add_child(_make_player_mesh(Color(0.9, 0.9, 0.9)))
+		add_child(p)
+
+	# Coverage (blue) — 10 players in a straight line 46 units upfield from returner
+	var coverage_center = returner_pos + field_fwd * 46
+	coverage_center.y = ground_y
+	for i in range(10):
+		var offset = (i - 4.5) * 4.5
+		var pos = coverage_center + field_right * offset
+		pos.y = ground_y
+		var p = StaticBody3D.new()
+		p.position = pos
 		p.add_child(_make_player_mesh(Color(0.1, 0.2, 0.8)))
 		add_child(p)
 
-	# Kicker (blue) — alone, further back behind the coverage line
+	# Kicker (blue) — alone at center, far upfield behind the coverage line
+	var kicker_pos = returner_pos + field_fwd * 68
+	kicker_pos.y = ground_y
 	var kicker = StaticBody3D.new()
-	kicker.position = Vector3(-0.5, ground_y, -40)
+	kicker.position = kicker_pos
 	kicker.add_child(_make_player_mesh(Color(0.1, 0.2, 0.8)))
 	add_child(kicker)
-
-	# Blockers (white) — 10 players in one straight line ahead of returner
-	var blocker_x = [-22.0, -17.0, -12.0, -7.0, -2.0, 3.0, 8.0, 13.0, 18.0, 23.0]
-	for x in blocker_x:
-		var p = StaticBody3D.new()
-		p.position = Vector3(x, ground_y, 10)
-		p.add_child(_make_player_mesh(Color(0.9, 0.9, 0.9)))
-		add_child(p)
 
 func _create_camera():
 	camera = Camera3D.new()
