@@ -304,7 +304,7 @@ func _physics_process(delta):
 		if Input.is_action_pressed("ui_down"):  dir -= field_fwd
 		if Input.is_action_pressed("ui_left"):  dir -= field_right
 		if Input.is_action_pressed("ui_right"): dir += field_right
-		player.velocity = dir * speed
+		player.velocity = dir * base_speed
 		player.move_and_slide()
 
 		football_fall_time = min(football_fall_time + delta, football_fall_duration)
