@@ -88,12 +88,25 @@ func _create_other_players():
 
 	var returner_pos = Vector3(-0.5, ground_y, 28)
 
-	# Blockers (white) — 10 players at the receiving team's 40-yard line
-	var blocker_center = returner_pos + field_fwd * 36
-	blocker_center.y = ground_y
-	for i in range(10):
-		var offset = (i - 4.5) * 4.5
-		var pos = blocker_center + field_right * offset
+	# Blockers (white) — NFL 2024 kickoff rules:
+	# 6 players on B35 restraining line (outside numbers, numbers to hashes, inside hashes x2 sides)
+	var b35_center = returner_pos + field_fwd * 36
+	b35_center.y = ground_y
+	var b35_offsets = [-20.0, -11.0, -4.0, 4.0, 11.0, 20.0]
+	for offset in b35_offsets:
+		var pos = b35_center + field_right * offset
+		pos.y = ground_y
+		var p = StaticBody3D.new()
+		p.position = pos
+		p.add_child(_make_player_mesh(Color(0.9, 0.9, 0.9)))
+		add_child(p)
+
+	# 3 players in setup zone (B30-B35), one per zone (left, center, right)
+	var setup_center = returner_pos + field_fwd * 32
+	setup_center.y = ground_y
+	var setup_offsets = [-13.0, 0.0, 13.0]
+	for offset in setup_offsets:
+		var pos = setup_center + field_right * offset
 		pos.y = ground_y
 		var p = StaticBody3D.new()
 		p.position = pos
