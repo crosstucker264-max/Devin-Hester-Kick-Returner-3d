@@ -12,8 +12,6 @@ var ground_y = -10.4
 
 # Game phases: "overhead" = waiting to catch, "active" = running with ball
 var game_phase = "overhead"
-var coverage_players = []
-var coverage_speed = 7.0
 var ball_circle = null
 var ball_target = Vector3.ZERO
 var football = null
@@ -25,6 +23,14 @@ var football_fall_duration = 3.0
 var field_fwd = Vector3.ZERO
 var field_right = Vector3.ZERO
 
+# Coverage: each entry has {body, lane_offset, speed}
+var coverage_data = []
+var coverage_speed = 7.0
+
+# Blockers: each entry has {body, target_index} — target_index = which coverage player to block
+var blocker_data = []
+var blocker_speed = 6.5
+
 func _ready():
 	_setup_field_vectors()
 	_load_stadium()
@@ -32,6 +38,7 @@ func _ready():
 	_create_other_players()
 	_create_ball_circle()
 	_create_football()
+	_create_end_zone_marker()
 	_create_camera()
 	_create_lighting()
 	_create_label()
@@ -42,30 +49,50 @@ func _setup_field_vectors():
 	field_fwd = (far_end - near_end).normalized()
 	field_right = Vector3(-field_fwd.z, 0, field_fwd.x)
 
+func _create_end_zone_marker():
+	# Blue end zone on the far side — where the returner scores
+	var returner_pos = Vector3(-0.5, ground_y, 28)
+	var ez_center = returner_pos + field_fwd * 99  # ~far goal line
+	ez_center.y = ground_y + 0.03
+
+	var ez = MeshInstance3D.new()
+	var box = BoxMesh.new()
+	box.size = Vector3(50.0, 0.05, 9.5)  # wide, flat, 10 yards deep
+	ez.mesh = box
+	ez.position = ez_center
+	# Rotate the box to align with the field diagonal
+	ez.rotation.y = atan2(field_fwd.x, field_fwd.z)
+
+	var mat = StandardMaterial3D.new()
+	mat.albedo_color = Color(0.1, 0.2, 0.9, 0.6)
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.emission_enabled = true
+	mat.emission = Color(0.1, 0.3, 1.0)
+	mat.emission_energy_multiplier = 0.5
+	ez.material_override = mat
+	add_child(ez)
+
 func _create_football():
 	football = MeshInstance3D.new()
 	var sphere = SphereMesh.new()
 	sphere.radius = 0.35
 	sphere.height = 0.9
 	football.mesh = sphere
-	football.scale = Vector3(1.0, 1.0, 1.4)  # elongate to oval football shape
+	football.scale = Vector3(1.0, 1.0, 1.4)
 	var mat = StandardMaterial3D.new()
-	mat.albedo_color = Color(0.4, 0.22, 0.07)  # brown
+	mat.albedo_color = Color(0.4, 0.22, 0.07)
 	football.material_override = mat
 	football_start_y = ground_y + 30.0
 	football.position = Vector3(ball_target.x, football_start_y, ball_target.z)
 	add_child(football)
 
 func _create_ball_circle():
-	# Place the ball landing target randomly within the landing zone (goal line to B20)
-	# In world units: roughly 4 to 22 units upfield from returner
 	var returner_pos = Vector3(-0.5, ground_y, 28)
 	var dist_upfield = randf_range(6.0, 20.0)
 	var side_offset = randf_range(-8.0, 8.0)
 	ball_target = returner_pos + field_fwd * dist_upfield + field_right * side_offset
-	ball_target.y = ground_y + 0.05  # just above ground
+	ball_target.y = ground_y + 0.05
 
-	# Create a flat glowing ring on the ground
 	ball_circle = MeshInstance3D.new()
 	var ring = CylinderMesh.new()
 	ring.top_radius = 1.8
@@ -142,19 +169,20 @@ func _create_player():
 func _create_other_players():
 	var returner_pos = Vector3(-0.5, ground_y, 28)
 
-	# 6 blockers on B35 restraining line
+	# --- BLOCKERS (white) ---
+	# 6 on B35 restraining line + 3 in setup zone
+	var all_blocker_offsets = [-20.0, -11.0, -4.0, 4.0, 11.0, 20.0]  # B35
 	var b35_center = returner_pos + field_fwd * 36
 	b35_center.y = ground_y
-	var b35_offsets = [-20.0, -11.0, -4.0, 4.0, 11.0, 20.0]
-	for offset in b35_offsets:
+	for offset in all_blocker_offsets:
 		var pos = b35_center + field_right * offset
 		pos.y = ground_y
 		var p = StaticBody3D.new()
 		p.position = pos
 		p.add_child(_make_player_mesh(Color(0.9, 0.9, 0.9)))
 		add_child(p)
+		blocker_data.append({"body": p, "target_index": blocker_data.size() % 10})
 
-	# 3 blockers in setup zone
 	var setup_center = returner_pos + field_fwd * 32
 	setup_center.y = ground_y
 	for offset in [-13.0, 0.0, 13.0]:
@@ -164,19 +192,25 @@ func _create_other_players():
 		p.position = pos
 		p.add_child(_make_player_mesh(Color(0.9, 0.9, 0.9)))
 		add_child(p)
+		blocker_data.append({"body": p, "target_index": blocker_data.size() % 10})
 
-	# 10 coverage players at B40 — stored so they move after catch
+	# --- COVERAGE (blue) — NFL lane discipline ---
+	# Each player has a lane offset they maintain until close to the returner
+	# Outer players (gunners) are faster and angle wider
 	var coverage_center = returner_pos + field_fwd * 41
 	coverage_center.y = ground_y
+	var lane_offsets = [-20.0, -14.0, -9.0, -5.0, -1.5, 1.5, 5.0, 9.0, 14.0, 20.0]
 	for i in range(10):
-		var offset = (i - 4.5) * 4.5
+		var offset = lane_offsets[i]
 		var pos = coverage_center + field_right * offset
 		pos.y = ground_y
 		var p = StaticBody3D.new()
 		p.position = pos
 		p.add_child(_make_player_mesh(Color(0.1, 0.2, 0.8)))
 		add_child(p)
-		coverage_players.append(p)
+		# Gunners (outermost) are faster; inner players slightly slower
+		var spd = coverage_speed + 1.5 if abs(offset) >= 18.0 else coverage_speed
+		coverage_data.append({"body": p, "lane_offset": offset, "speed": spd})
 
 	# Kicker at A35
 	var kicker_pos = returner_pos + field_fwd * 63
@@ -218,11 +252,9 @@ func _create_lighting():
 
 func _physics_process(delta):
 	if game_phase == "overhead":
-		# Overhead camera — close above the landing zone
 		camera.position = ball_target + Vector3(0, 22, 0)
 		camera.look_at(ball_target, Vector3(0, 0, -1))
 
-		# Player can move to get under the circle
 		var dir = Vector3.ZERO
 		if Input.is_action_pressed("ui_up"):    dir += field_fwd
 		if Input.is_action_pressed("ui_down"):  dir -= field_fwd
@@ -231,32 +263,29 @@ func _physics_process(delta):
 		player.velocity = dir * speed
 		player.move_and_slide()
 
-		# Animate football falling down toward the circle
+		# Football falls toward circle
 		football_fall_time = min(football_fall_time + delta, football_fall_duration)
 		var t_fall = football_fall_time / football_fall_duration
 		var current_y = lerp(football_start_y, ball_target.y + 0.5, t_fall)
 		football.position = Vector3(ball_target.x, current_y, ball_target.z)
-		football.rotation_degrees.x += 180.0 * delta  # spin as it falls
+		football.rotation_degrees.x += 180.0 * delta
 
-		# Pulse size and blink visibility
+		# Pulse and blink circle
 		var t = Time.get_ticks_msec() * 0.001
 		var pulse = sin(t * 5.0) * 0.3 + 1.0
 		ball_circle.scale = Vector3(pulse, 1.0, pulse)
 		ball_circle.visible = sin(t * 8.0) > 0.0
 
-		# Check if player is under the circle — catch the ball!
 		var flat_dist = Vector2(player.position.x - ball_target.x, player.position.z - ball_target.z).length()
 		if flat_dist < 2.0:
 			_catch_ball()
 
-		label.text = "Ball incoming! Run under the yellow circle to catch it!\nArrow keys = move"
+		label.text = "Ball incoming! Run under the yellow circle!\nArrow keys = move"
 
 	elif game_phase == "active":
-		# Third-person camera behind the player
 		camera.position = player.position + Vector3(cam_side, cam_height, cam_dist)
 		camera.look_at(player.position + Vector3(0, 1, 0), Vector3.UP)
 
-		# Player moves based on camera direction
 		var cam_forward = -camera.global_transform.basis.z
 		var cam_right_vec = camera.global_transform.basis.x
 		cam_forward.y = 0
@@ -272,14 +301,38 @@ func _physics_process(delta):
 		player.velocity = dir * speed
 		player.move_and_slide()
 
-		# Coverage runs straight at the returner
-		for p in coverage_players:
-			var to_player = player.position - p.position
-			to_player.y = 0
-			if to_player.length() > 1.0:
-				p.position += to_player.normalized() * coverage_speed * delta
+		# Coverage — NFL lane discipline: stay in lane until close, then converge
+		for data in coverage_data:
+			var p = data.body
+			var lane_off = data.lane_offset
+			var spd = data.speed
 
-		label.text = "Arrow keys = run!  Get past the coverage!"
+			var to_returner = player.position - p.position
+			to_returner.y = 0
+			var dist = to_returner.length()
+
+			# Run in their lane downfield; converge on returner when within 20 units
+			var blend = clamp(1.0 - dist / 20.0, 0.0, 1.0)
+			var lane_dir = field_fwd  # straight downfield
+			var converge_dir = to_returner.normalized()
+			var move_dir = lane_dir.lerp(converge_dir, blend).normalized()
+
+			if dist > 1.0:
+				p.position += move_dir * spd * delta
+
+		# Blockers — run toward their assigned coverage player to block
+		for i in range(blocker_data.size()):
+			var bdata = blocker_data[i]
+			var b = bdata.body
+			var tidx = bdata.target_index
+			var target_pos = coverage_data[tidx].body.position
+
+			var to_target = target_pos - b.position
+			to_target.y = 0
+			if to_target.length() > 1.5:
+				b.position += to_target.normalized() * blocker_speed * delta
+
+		label.text = "Run to the BLUE end zone!\nArrow keys = move"
 
 func _catch_ball():
 	game_phase = "active"
