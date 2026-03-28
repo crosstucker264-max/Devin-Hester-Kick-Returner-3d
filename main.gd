@@ -6,7 +6,7 @@ var speed = 10.0
 
 # Field center offset — adjust if stadium model is off center
 var field_center = Vector3(0, 0, 0)
-var ground_y = -2.5  # adjust this until players sit on the field
+var ground_y = -3.5  # adjust this until players sit on the field
 
 func _ready():
 	_load_stadium()
@@ -66,10 +66,10 @@ func _create_player():
 func _create_other_players():
 	# Coverage team (blue) — spread across the 40-50 yard line area
 	var coverage_positions = [
-		Vector3(-20, ground_y, -30), Vector3(-15, ground_y, -30), Vector3(-10, ground_y, -30),
-		Vector3(-5,  ground_y, -30), Vector3(0,   ground_y, -30), Vector3(5,   ground_y, -30),
-		Vector3(10,  ground_y, -30), Vector3(15,  ground_y, -30), Vector3(20,  ground_y, -30),
-		Vector3(-8,  ground_y, -40), Vector3(8,   ground_y, -40)
+		Vector3(-20, ground_y, -15), Vector3(-15, ground_y, -15), Vector3(-10, ground_y, -15),
+		Vector3(-5,  ground_y, -15), Vector3(0,   ground_y, -15), Vector3(5,   ground_y, -15),
+		Vector3(10,  ground_y, -15), Vector3(15,  ground_y, -15), Vector3(20,  ground_y, -15),
+		Vector3(-8,  ground_y, -20), Vector3(8,   ground_y, -20)
 	]
 	for pos in coverage_positions:
 		var p = StaticBody3D.new()
