@@ -213,9 +213,11 @@ func _physics_process(delta):
 		player.velocity = dir * speed
 		player.move_and_slide()
 
-		# Pulse the circle so it's easy to see
-		var pulse = sin(Time.get_ticks_msec() * 0.005) * 0.3 + 1.0
+		# Pulse size and blink visibility
+		var t = Time.get_ticks_msec() * 0.001
+		var pulse = sin(t * 5.0) * 0.3 + 1.0
 		ball_circle.scale = Vector3(pulse, 1.0, pulse)
+		ball_circle.visible = sin(t * 8.0) > 0.0
 
 		# Check if player is under the circle — catch the ball!
 		var flat_dist = Vector2(player.position.x - ball_target.x, player.position.z - ball_target.z).length()
