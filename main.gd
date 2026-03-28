@@ -6,6 +6,7 @@ var label
 var big_label
 var stamina_bar_bg: ColorRect
 var stamina_bar_fill: ColorRect
+var try_again_btn: Button
 
 var cam_height = 5.2
 var cam_dist = 9.7
@@ -168,9 +169,23 @@ func _create_label():
 	big_label.add_theme_font_size_override("font_size", 72)
 	big_label.add_theme_color_override("font_color", Color(1, 1, 1))
 	big_label.set_anchors_preset(Control.PRESET_CENTER)
+	big_label.position.y -= 60
 	big_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	big_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	canvas.add_child(big_label)
+
+	# Try Again button — shown after touchdown or tackle
+	try_again_btn = Button.new()
+	try_again_btn.text = "Try Again"
+	try_again_btn.visible = false
+	try_again_btn.name = "TryAgainBtn"
+	try_again_btn.add_theme_font_size_override("font_size", 36)
+	try_again_btn.set_anchors_preset(Control.PRESET_CENTER)
+	try_again_btn.position.y += 40
+	try_again_btn.size = Vector2(200, 60)
+	try_again_btn.position.x -= 100
+	try_again_btn.pressed.connect(_on_try_again)
+	canvas.add_child(try_again_btn)
 
 func _load_stadium():
 	var stadium_scene = load("res://arabian_knights_football_stadium_arabal.glb")
@@ -463,11 +478,16 @@ func _touchdown():
 	big_label.visible = true
 	big_label.text = "TOUCHDOWN!"
 	big_label.add_theme_color_override("font_color", Color(1.0, 0.85, 0.0))
+	try_again_btn.visible = true
 	label.text = ""
 
 func _tackled():
 	game_phase = "tackled"
 	big_label.visible = true
-	big_label.text = "TACKLED!\nTry Again"
+	big_label.text = "TACKLED!"
 	big_label.add_theme_color_override("font_color", Color(1.0, 0.2, 0.2))
+	try_again_btn.visible = true
 	label.text = ""
+
+func _on_try_again():
+	get_tree().reload_current_scene()
