@@ -16,6 +16,10 @@ var coverage_players = []
 var coverage_speed = 7.0
 var ball_circle = null
 var ball_target = Vector3.ZERO
+var football = null
+var football_start_y = 0.0
+var football_fall_time = 0.0
+var football_fall_duration = 3.0
 
 # Field direction vectors
 var field_fwd = Vector3.ZERO
@@ -27,6 +31,7 @@ func _ready():
 	_create_player()
 	_create_other_players()
 	_create_ball_circle()
+	_create_football()
 	_create_camera()
 	_create_lighting()
 	_create_label()
@@ -36,6 +41,20 @@ func _setup_field_vectors():
 	var far_end = Vector3(-24, 0, -65)
 	field_fwd = (far_end - near_end).normalized()
 	field_right = Vector3(-field_fwd.z, 0, field_fwd.x)
+
+func _create_football():
+	football = MeshInstance3D.new()
+	var sphere = SphereMesh.new()
+	sphere.radius = 0.35
+	sphere.height = 0.9
+	football.mesh = sphere
+	football.scale = Vector3(1.0, 1.0, 1.4)  # elongate to oval football shape
+	var mat = StandardMaterial3D.new()
+	mat.albedo_color = Color(0.4, 0.22, 0.07)  # brown
+	football.material_override = mat
+	football_start_y = ground_y + 30.0
+	football.position = Vector3(ball_target.x, football_start_y, ball_target.z)
+	add_child(football)
 
 func _create_ball_circle():
 	# Place the ball landing target randomly within the landing zone (goal line to B20)
@@ -199,10 +218,9 @@ func _create_lighting():
 
 func _physics_process(delta):
 	if game_phase == "overhead":
-		# Overhead camera — directly above the landing zone, looking straight down
-		var look_center = ball_target + Vector3(0, 0, 6)
-		camera.position = look_center + Vector3(0, 45, 0)
-		camera.look_at(look_center, Vector3(0, 0, -1))
+		# Overhead camera — close above the landing zone
+		camera.position = ball_target + Vector3(0, 22, 0)
+		camera.look_at(ball_target, Vector3(0, 0, -1))
 
 		# Player can move to get under the circle
 		var dir = Vector3.ZERO
@@ -212,6 +230,13 @@ func _physics_process(delta):
 		if Input.is_action_pressed("ui_right"): dir += field_right
 		player.velocity = dir * speed
 		player.move_and_slide()
+
+		# Animate football falling down toward the circle
+		football_fall_time = min(football_fall_time + delta, football_fall_duration)
+		var t_fall = football_fall_time / football_fall_duration
+		var current_y = lerp(football_start_y, ball_target.y + 0.5, t_fall)
+		football.position = Vector3(ball_target.x, current_y, ball_target.z)
+		football.rotation_degrees.x += 180.0 * delta  # spin as it falls
 
 		# Pulse size and blink visibility
 		var t = Time.get_ticks_msec() * 0.001
@@ -258,6 +283,7 @@ func _physics_process(delta):
 
 func _catch_ball():
 	game_phase = "active"
-	# Remove the circle
 	ball_circle.queue_free()
 	ball_circle = null
+	football.queue_free()
+	football = null
