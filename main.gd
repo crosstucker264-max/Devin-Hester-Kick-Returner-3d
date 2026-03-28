@@ -4,9 +4,13 @@ var player
 var camera
 var speed = 10.0
 
+# Field center offset — adjust if stadium model is off center
+var field_center = Vector3(0, 0, 0)
+
 func _ready():
 	_load_stadium()
 	_create_player()
+	_create_other_players()
 	_create_camera()
 	_create_lighting()
 
@@ -15,7 +19,6 @@ func _load_stadium():
 	if stadium_scene:
 		var stadium = stadium_scene.instantiate()
 		add_child(stadium)
-		# Apply cartoon style after adding to scene
 		await get_tree().process_frame
 		_apply_cartoon(stadium)
 	else:
@@ -27,7 +30,6 @@ func _apply_cartoon(node):
 			var mat = node.get_active_material(i)
 			if mat is StandardMaterial3D:
 				var new_mat = mat.duplicate()
-				# Boost saturation and flatten shading for cartoon look
 				new_mat.albedo_color = new_mat.albedo_color.lightened(0.15)
 				new_mat.roughness = 1.0
 				new_mat.metallic = 0.0
@@ -35,9 +37,21 @@ func _apply_cartoon(node):
 	for child in node.get_children():
 		_apply_cartoon(child)
 
+func _make_player_mesh(color: Color) -> MeshInstance3D:
+	var mesh = MeshInstance3D.new()
+	var cap = CapsuleMesh.new()
+	cap.radius = 0.4
+	cap.height = 1.8
+	mesh.mesh = cap
+	var mat = StandardMaterial3D.new()
+	mat.albedo_color = color
+	mesh.material_override = mat
+	return mesh
+
 func _create_player():
+	# Returner — red, at the 10 yard line (back of field)
 	player = CharacterBody3D.new()
-	player.position = Vector3(0, 1, 0)
+	player.position = Vector3(0, 1, 45)  # 10 yard line from back end zone
 
 	var col = CollisionShape3D.new()
 	var shape = CapsuleShape3D.new()
@@ -45,41 +59,53 @@ func _create_player():
 	shape.height = 1.8
 	col.shape = shape
 	player.add_child(col)
-
-	var mesh = MeshInstance3D.new()
-	var cap = CapsuleMesh.new()
-	cap.radius = 0.4
-	cap.height = 1.8
-	mesh.mesh = cap
-	var pmat = StandardMaterial3D.new()
-	pmat.albedo_color = Color(0.8, 0.1, 0.1)
-	mesh.material_override = pmat
-	player.add_child(mesh)
-
+	player.add_child(_make_player_mesh(Color(0.8, 0.1, 0.1)))
 	add_child(player)
+
+func _create_other_players():
+	# Coverage team (blue) — spread across the 40-50 yard line area
+	var coverage_positions = [
+		Vector3(-20, 1, -5), Vector3(-15, 1, -5), Vector3(-10, 1, -5),
+		Vector3(-5,  1, -5), Vector3(0,   1, -5), Vector3(5,   1, -5),
+		Vector3(10,  1, -5), Vector3(15,  1, -5), Vector3(20,  1, -5),
+		Vector3(-8,  1, -15), Vector3(8,  1, -15)
+	]
+	for pos in coverage_positions:
+		var p = StaticBody3D.new()
+		p.position = pos
+		p.add_child(_make_player_mesh(Color(0.1, 0.2, 0.8)))
+		add_child(p)
+
+	# Blockers (white) — spread between returner and coverage
+	var blocker_positions = [
+		Vector3(-20, 1, 20), Vector3(-15, 1, 20), Vector3(-10, 1, 20),
+		Vector3(-5,  1, 20), Vector3(0,   1, 20), Vector3(5,   1, 20),
+		Vector3(10,  1, 20), Vector3(15,  1, 20), Vector3(20,  1, 20),
+		Vector3(-8,  1, 30)
+	]
+	for pos in blocker_positions:
+		var p = StaticBody3D.new()
+		p.position = pos
+		p.add_child(_make_player_mesh(Color(0.9, 0.9, 0.9)))
+		add_child(p)
 
 func _create_camera():
 	camera = Camera3D.new()
-	camera.position = Vector3(0, 8, 20)
-	camera.rotation_degrees = Vector3(-20, 0, 0)
 	add_child(camera)
 
 func _create_lighting():
-	# Soft shadowless light for flat cartoon look
 	var light = DirectionalLight3D.new()
 	light.rotation_degrees = Vector3(-60, 30, 0)
 	light.light_energy = 1.2
 	light.shadow_enabled = false
 	add_child(light)
 
-	# Fill light from opposite side to flatten shadows
 	var fill = DirectionalLight3D.new()
 	fill.rotation_degrees = Vector3(-30, 210, 0)
 	fill.light_energy = 0.6
 	fill.shadow_enabled = false
 	add_child(fill)
 
-	# Bright cartoon sky
 	var env = Environment.new()
 	env.background_mode = Environment.BG_COLOR
 	env.background_color = Color(0.35, 0.65, 1.0)
@@ -108,6 +134,7 @@ func _physics_process(delta):
 	player.velocity = dir * speed
 	player.move_and_slide()
 
-	# Camera follows player from behind
-	camera.position = player.position + Vector3(0, 8, 20)
-	camera.look_at(player.position, Vector3.UP)
+	# Camera locked behind and above returner, always centered on him
+	var cam_offset = Vector3(0, 8, 18)
+	camera.position = player.position + cam_offset
+	camera.look_at(player.position + Vector3(0, 1, 0), Vector3.UP)
