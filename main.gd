@@ -26,9 +26,11 @@ var game_phase = "overhead"
 var ball_circle = null
 var ball_target = Vector3.ZERO
 var football = null
-var football_start_y = 0.0
+var football_kick_pos = Vector3.ZERO  # where the ball starts (kicker's feet)
 var football_fall_time = 0.0
-var football_fall_duration = 3.0
+var football_fall_duration = 3.5
+var kicker_body = null
+var kicker_speed = 0.0
 
 # Field direction vectors
 var field_fwd = Vector3.ZERO
@@ -93,8 +95,10 @@ func _create_football():
 	var mat = StandardMaterial3D.new()
 	mat.albedo_color = Color(0.4, 0.22, 0.07)
 	football.material_override = mat
-	football_start_y = ground_y + 30.0
-	football.position = Vector3(ball_target.x, football_start_y, ball_target.z)
+	# Ball starts at the kicker's position
+	football_kick_pos = Vector3(-0.5, ground_y, 28) + field_fwd * 63
+	football_kick_pos.y = ground_y + 1.0
+	football.position = football_kick_pos
 	add_child(football)
 
 func _create_ball_circle():
@@ -258,13 +262,14 @@ func _create_other_players():
 			"broke_free": false
 		})
 
-	# Kicker at A35
+	# Kicker at A35 — stored so he can chase after kick
 	var kicker_pos = returner_pos + field_fwd * 63
 	kicker_pos.y = ground_y
-	var kicker = StaticBody3D.new()
-	kicker.position = kicker_pos
-	kicker.add_child(_make_player_mesh(Color(0.1, 0.2, 0.8)))
-	add_child(kicker)
+	kicker_body = StaticBody3D.new()
+	kicker_body.position = kicker_pos
+	kicker_body.add_child(_make_player_mesh(Color(0.1, 0.2, 0.8)))
+	add_child(kicker_body)
+	kicker_speed = coverage_speed * 0.7  # 70% of coverage speed
 
 func _create_camera():
 	camera = Camera3D.new()
@@ -307,11 +312,14 @@ func _physics_process(delta):
 		player.velocity = dir * base_speed
 		player.move_and_slide()
 
+		# Football arcs from kicker to landing target
 		football_fall_time = min(football_fall_time + delta, football_fall_duration)
 		var t_fall = football_fall_time / football_fall_duration
-		var current_y = lerp(football_start_y, ball_target.y + 0.5, t_fall)
-		football.position = Vector3(ball_target.x, current_y, ball_target.z)
-		football.rotation_degrees.x += 180.0 * delta
+		var flat_x = lerp(football_kick_pos.x, ball_target.x, t_fall)
+		var flat_z = lerp(football_kick_pos.z, ball_target.z, t_fall)
+		var arc_y = ground_y + 1.0 + 22.0 * sin(t_fall * PI)
+		football.position = Vector3(flat_x, arc_y, flat_z)
+		football.rotation_degrees.x += 360.0 * delta
 
 		var t = Time.get_ticks_msec() * 0.001
 		var pulse = sin(t * 5.0) * 0.3 + 1.0
@@ -409,6 +417,15 @@ func _physics_process(delta):
 			if dist < 1.5:
 				_tackled()
 				return
+
+		# Kicker chases at 70% speed after the catch
+		var to_player_k = player.position - kicker_body.position
+		to_player_k.y = 0
+		if to_player_k.length() > 1.0:
+			kicker_body.position += to_player_k.normalized() * kicker_speed * delta
+		elif to_player_k.length() < 1.5:
+			_tackled()
+			return
 
 		# Check touchdown — returner crosses far goal line
 		var past_goal = (player.position - far_goal_line).dot(field_fwd)
