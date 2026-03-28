@@ -4,13 +4,14 @@ var player
 var camera
 var speed = 10.0
 var label
+var big_label  # center screen for TOUCHDOWN / TRY AGAIN
 var cam_height = 5.2
 var cam_dist = 9.7
 var cam_side = 2.5
 
 var ground_y = -10.4
 
-# Game phases: "overhead" = waiting to catch, "active" = running with ball
+# Game phases: overhead, active, touchdown, tackled
 var game_phase = "overhead"
 var ball_circle = null
 var ball_target = Vector3.ZERO
@@ -23,11 +24,14 @@ var football_fall_duration = 3.0
 var field_fwd = Vector3.ZERO
 var field_right = Vector3.ZERO
 
-# Coverage: each entry has {body, lane_offset, speed}
+# Far goal line position (for touchdown detection)
+var far_goal_line = Vector3.ZERO
+
+# Coverage: {body, lane_offset, speed, is_blocked, block_timer, block_duration, broke_free}
 var coverage_data = []
 var coverage_speed = 7.0
 
-# Blockers: each entry has {body, target_index} — target_index = which coverage player to block
+# Blockers: {body, target_index}
 var blocker_data = []
 var blocker_speed = 6.5
 
@@ -48,21 +52,18 @@ func _setup_field_vectors():
 	var far_end = Vector3(-24, 0, -65)
 	field_fwd = (far_end - near_end).normalized()
 	field_right = Vector3(-field_fwd.z, 0, field_fwd.x)
+	var returner_pos = Vector3(-0.5, ground_y, 28)
+	far_goal_line = returner_pos + field_fwd * 95
 
 func _create_end_zone_marker():
-	# Blue end zone on the far side — where the returner scores
-	var returner_pos = Vector3(-0.5, ground_y, 28)
-	var ez_center = returner_pos + field_fwd * 99  # ~far goal line
+	var ez_center = far_goal_line + field_fwd * 4.75
 	ez_center.y = ground_y + 0.03
-
 	var ez = MeshInstance3D.new()
 	var box = BoxMesh.new()
-	box.size = Vector3(50.0, 0.05, 9.5)  # wide, flat, 10 yards deep
+	box.size = Vector3(50.0, 0.05, 9.5)
 	ez.mesh = box
 	ez.position = ez_center
-	# Rotate the box to align with the field diagonal
 	ez.rotation.y = atan2(field_fwd.x, field_fwd.z)
-
 	var mat = StandardMaterial3D.new()
 	mat.albedo_color = Color(0.1, 0.2, 0.9, 0.6)
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -92,7 +93,6 @@ func _create_ball_circle():
 	var side_offset = randf_range(-8.0, 8.0)
 	ball_target = returner_pos + field_fwd * dist_upfield + field_right * side_offset
 	ball_target.y = ground_y + 0.05
-
 	ball_circle = MeshInstance3D.new()
 	var ring = CylinderMesh.new()
 	ring.top_radius = 1.8
@@ -101,7 +101,6 @@ func _create_ball_circle():
 	ring.rings = 1
 	ball_circle.mesh = ring
 	ball_circle.position = ball_target
-
 	var mat = StandardMaterial3D.new()
 	mat.albedo_color = Color(1.0, 1.0, 0.0, 0.7)
 	mat.emission_enabled = true
@@ -114,11 +113,22 @@ func _create_ball_circle():
 func _create_label():
 	var canvas = CanvasLayer.new()
 	add_child(canvas)
+
 	label = Label.new()
 	label.position = Vector2(10, 10)
 	label.add_theme_font_size_override("font_size", 26)
 	label.add_theme_color_override("font_color", Color(1, 1, 0))
 	canvas.add_child(label)
+
+	# Big center label for TOUCHDOWN / TRY AGAIN
+	big_label = Label.new()
+	big_label.visible = false
+	big_label.add_theme_font_size_override("font_size", 72)
+	big_label.add_theme_color_override("font_color", Color(1, 1, 1))
+	big_label.set_anchors_preset(Control.PRESET_CENTER)
+	big_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	big_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	canvas.add_child(big_label)
 
 func _load_stadium():
 	var stadium_scene = load("res://arabian_knights_football_stadium_arabal.glb")
@@ -170,11 +180,9 @@ func _create_other_players():
 	var returner_pos = Vector3(-0.5, ground_y, 28)
 
 	# --- BLOCKERS (white) ---
-	# 6 on B35 restraining line + 3 in setup zone
-	var all_blocker_offsets = [-20.0, -11.0, -4.0, 4.0, 11.0, 20.0]  # B35
 	var b35_center = returner_pos + field_fwd * 36
 	b35_center.y = ground_y
-	for offset in all_blocker_offsets:
+	for offset in [-20.0, -11.0, -4.0, 4.0, 11.0, 20.0]:
 		var pos = b35_center + field_right * offset
 		pos.y = ground_y
 		var p = StaticBody3D.new()
@@ -194,9 +202,7 @@ func _create_other_players():
 		add_child(p)
 		blocker_data.append({"body": p, "target_index": blocker_data.size() % 10})
 
-	# --- COVERAGE (blue) — NFL lane discipline ---
-	# Each player has a lane offset they maintain until close to the returner
-	# Outer players (gunners) are faster and angle wider
+	# --- COVERAGE (blue) — with lane discipline and random block durations ---
 	var coverage_center = returner_pos + field_fwd * 41
 	coverage_center.y = ground_y
 	var lane_offsets = [-20.0, -14.0, -9.0, -5.0, -1.5, 1.5, 5.0, 9.0, 14.0, 20.0]
@@ -208,9 +214,16 @@ func _create_other_players():
 		p.position = pos
 		p.add_child(_make_player_mesh(Color(0.1, 0.2, 0.8)))
 		add_child(p)
-		# Gunners (outermost) are faster; inner players slightly slower
 		var spd = coverage_speed + 1.5 if abs(offset) >= 18.0 else coverage_speed
-		coverage_data.append({"body": p, "lane_offset": offset, "speed": spd})
+		coverage_data.append({
+			"body": p,
+			"lane_offset": offset,
+			"speed": spd,
+			"is_blocked": false,
+			"block_timer": 0.0,
+			"block_duration": randf_range(0.5, 4.0),
+			"broke_free": false
+		})
 
 	# Kicker at A35
 	var kicker_pos = returner_pos + field_fwd * 63
@@ -230,13 +243,11 @@ func _create_lighting():
 	light.light_energy = 1.2
 	light.shadow_enabled = false
 	add_child(light)
-
 	var fill = DirectionalLight3D.new()
 	fill.rotation_degrees = Vector3(-30, 210, 0)
 	fill.light_energy = 0.6
 	fill.shadow_enabled = false
 	add_child(fill)
-
 	var env = Environment.new()
 	env.background_mode = Environment.BG_COLOR
 	env.background_color = Color(0.35, 0.65, 1.0)
@@ -263,14 +274,12 @@ func _physics_process(delta):
 		player.velocity = dir * speed
 		player.move_and_slide()
 
-		# Football falls toward circle
 		football_fall_time = min(football_fall_time + delta, football_fall_duration)
 		var t_fall = football_fall_time / football_fall_duration
 		var current_y = lerp(football_start_y, ball_target.y + 0.5, t_fall)
 		football.position = Vector3(ball_target.x, current_y, ball_target.z)
 		football.rotation_degrees.x += 180.0 * delta
 
-		# Pulse and blink circle
 		var t = Time.get_ticks_msec() * 0.001
 		var pulse = sin(t * 5.0) * 0.3 + 1.0
 		ball_circle.scale = Vector3(pulse, 1.0, pulse)
@@ -301,38 +310,61 @@ func _physics_process(delta):
 		player.velocity = dir * speed
 		player.move_and_slide()
 
-		# Coverage — NFL lane discipline: stay in lane until close, then converge
-		for data in coverage_data:
-			var p = data.body
-			var lane_off = data.lane_offset
-			var spd = data.speed
+		# Blockers run toward their assigned coverage player
+		for bdata in blocker_data:
+			var b = bdata.body
+			var cdata = coverage_data[bdata.target_index]
+			# Only pursue if coverage hasn't broken free
+			if not cdata.broke_free:
+				var to_target = cdata.body.position - b.position
+				to_target.y = 0
+				if to_target.length() > 1.5:
+					b.position += to_target.normalized() * blocker_speed * delta
+				else:
+					# Close enough — trigger the block
+					if not cdata.is_blocked:
+						cdata.is_blocked = true
+						cdata.block_timer = cdata.block_duration
 
+		# Coverage movement — blocked by white, then break free and chase returner
+		for cdata in coverage_data:
+			var p = cdata.body
+
+			if cdata.is_blocked:
+				# Count down the block — stuck in place
+				cdata.block_timer -= delta
+				if cdata.block_timer <= 0.0:
+					cdata.is_blocked = false
+					cdata.broke_free = true
+				continue  # can't move while blocked
+
+			# Once free (or unblocked gunners), chase returner with lane discipline
 			var to_returner = player.position - p.position
 			to_returner.y = 0
 			var dist = to_returner.length()
 
-			# Run in their lane downfield; converge on returner when within 20 units
-			var blend = clamp(1.0 - dist / 20.0, 0.0, 1.0)
-			var lane_dir = field_fwd  # straight downfield
-			var converge_dir = to_returner.normalized()
-			var move_dir = lane_dir.lerp(converge_dir, blend).normalized()
+			var blend = clamp(1.0 - dist / 20.0, 0.0, 1.0) if not cdata.broke_free else 1.0
+			var move_dir = field_fwd.lerp(to_returner.normalized(), blend).normalized()
 
 			if dist > 1.0:
-				p.position += move_dir * spd * delta
+				p.position += move_dir * cdata.speed * delta
 
-		# Blockers — run toward their assigned coverage player to block
-		for i in range(blocker_data.size()):
-			var bdata = blocker_data[i]
-			var b = bdata.body
-			var tidx = bdata.target_index
-			var target_pos = coverage_data[tidx].body.position
+			# Check tackle — blue touches red
+			if dist < 1.5:
+				_tackled()
+				return
 
-			var to_target = target_pos - b.position
-			to_target.y = 0
-			if to_target.length() > 1.5:
-				b.position += to_target.normalized() * blocker_speed * delta
+		# Check touchdown — returner crosses far goal line
+		var past_goal = (player.position - far_goal_line).dot(field_fwd)
+		if past_goal > 0:
+			_touchdown()
 
 		label.text = "Run to the BLUE end zone!\nArrow keys = move"
+
+	elif game_phase == "touchdown" or game_phase == "tackled":
+		# Freeze everything — just hold the camera
+		camera.position = player.position + Vector3(cam_side, cam_height, cam_dist)
+		camera.look_at(player.position + Vector3(0, 1, 0), Vector3.UP)
 
 func _catch_ball():
 	game_phase = "active"
@@ -340,3 +372,17 @@ func _catch_ball():
 	ball_circle = null
 	football.queue_free()
 	football = null
+
+func _touchdown():
+	game_phase = "touchdown"
+	big_label.visible = true
+	big_label.text = "TOUCHDOWN!"
+	big_label.add_theme_color_override("font_color", Color(1.0, 0.85, 0.0))
+	label.text = ""
+
+func _tackled():
+	game_phase = "tackled"
+	big_label.visible = true
+	big_label.text = "TACKLED!\nTry Again"
+	big_label.add_theme_color_override("font_color", Color(1.0, 0.2, 0.2))
+	label.text = ""
