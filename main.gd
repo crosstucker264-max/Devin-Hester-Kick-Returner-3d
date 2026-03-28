@@ -2,12 +2,22 @@ extends Node3D
 
 var player
 var camera
-var speed = 10.0
 var label
-var big_label  # center screen for TOUCHDOWN / TRY AGAIN
+var big_label
+var stamina_bar_bg: ColorRect
+var stamina_bar_fill: ColorRect
+
 var cam_height = 5.2
 var cam_dist = 9.7
 var cam_side = 2.5
+
+var base_speed = 6.0    # slightly under attackers (7.0)
+var sprint_speed = 10.0
+var stamina = 100.0
+var max_stamina = 100.0
+var stamina_drain = 35.0
+var stamina_regen = 18.0
+var exhausted = false   # can't sprint again until stamina recovers to 25
 
 var ground_y = -10.4
 
@@ -114,13 +124,36 @@ func _create_label():
 	var canvas = CanvasLayer.new()
 	add_child(canvas)
 
+	# Stamina label
+	var stam_label = Label.new()
+	stam_label.position = Vector2(10, 10)
+	stam_label.add_theme_font_size_override("font_size", 20)
+	stam_label.add_theme_color_override("font_color", Color(1, 1, 1))
+	stam_label.text = "STAMINA"
+	canvas.add_child(stam_label)
+
+	# Stamina bar background
+	stamina_bar_bg = ColorRect.new()
+	stamina_bar_bg.position = Vector2(10, 36)
+	stamina_bar_bg.size = Vector2(220, 22)
+	stamina_bar_bg.color = Color(0.2, 0.2, 0.2, 0.8)
+	canvas.add_child(stamina_bar_bg)
+
+	# Stamina bar fill
+	stamina_bar_fill = ColorRect.new()
+	stamina_bar_fill.position = Vector2(12, 38)
+	stamina_bar_fill.size = Vector2(216, 18)
+	stamina_bar_fill.color = Color(0.1, 0.9, 0.1)
+	canvas.add_child(stamina_bar_fill)
+
+	# Instruction label below the bar
 	label = Label.new()
-	label.position = Vector2(10, 10)
-	label.add_theme_font_size_override("font_size", 26)
+	label.position = Vector2(10, 64)
+	label.add_theme_font_size_override("font_size", 20)
 	label.add_theme_color_override("font_color", Color(1, 1, 0))
 	canvas.add_child(label)
 
-	# Big center label for TOUCHDOWN / TRY AGAIN
+	# Big center label for TOUCHDOWN / TACKLED
 	big_label = Label.new()
 	big_label.visible = false
 	big_label.add_theme_font_size_override("font_size", 72)
@@ -307,8 +340,31 @@ func _physics_process(delta):
 		if Input.is_action_pressed("ui_down"):  dir -= cam_forward
 		if Input.is_action_pressed("ui_left"):  dir -= cam_right_vec
 		if Input.is_action_pressed("ui_right"): dir += cam_right_vec
-		player.velocity = dir * speed
+
+		# Sprint logic
+		var is_sprinting = Input.is_key_pressed(KEY_SHIFT) and stamina > 0 and not exhausted
+		if is_sprinting and dir != Vector3.ZERO:
+			stamina = max(stamina - stamina_drain * delta, 0.0)
+			if stamina == 0.0:
+				exhausted = true
+		else:
+			stamina = min(stamina + stamina_regen * delta, max_stamina)
+			if exhausted and stamina >= 25.0:
+				exhausted = false
+
+		var current_speed = sprint_speed if is_sprinting else base_speed
+		player.velocity = dir * current_speed
 		player.move_and_slide()
+
+		# Update stamina bar fill and color
+		var pct = stamina / max_stamina
+		stamina_bar_fill.size.x = 216.0 * pct
+		if pct > 0.5:
+			stamina_bar_fill.color = Color(0.1, 0.9, 0.1)       # green
+		elif pct > 0.25:
+			stamina_bar_fill.color = Color(0.95, 0.75, 0.1)     # yellow
+		else:
+			stamina_bar_fill.color = Color(0.9, 0.1, 0.1)       # red
 
 		# Blockers run toward their assigned coverage player
 		for bdata in blocker_data:
