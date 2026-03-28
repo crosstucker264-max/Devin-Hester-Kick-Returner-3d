@@ -9,7 +9,7 @@ var cam_dist = 15.0
 
 # Field center offset — adjust if stadium model is off center
 var field_center = Vector3(0, 0, 0)
-var ground_y = -10.5  # adjust this until players sit on the field
+var ground_y = -10.4  # adjust this until players sit on the field
 
 func _ready():
 	_load_stadium()
