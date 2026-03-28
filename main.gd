@@ -81,10 +81,10 @@ func _create_player():
 func _create_other_players():
 	# Coverage team (blue) — spread across the 40-50 yard line area
 	var coverage_positions = [
-		Vector3(-31, ground_y, -32), Vector3(-24, ground_y, -32), Vector3(-17, ground_y, -32),
-		Vector3(-10.5, ground_y, -32), Vector3(-4, ground_y, -32), Vector3(3,  ground_y, -32),
-		Vector3(10,  ground_y, -32), Vector3(-24, ground_y, -42), Vector3(-10.5, ground_y, -42),
-		Vector3(3,   ground_y, -42), Vector3(-10.5, ground_y, -50)
+		Vector3(-21, ground_y, -26), Vector3(-14, ground_y, -26), Vector3(-7, ground_y, -26),
+		Vector3(-0.5, ground_y, -26), Vector3(6, ground_y, -26), Vector3(13, ground_y, -26),
+		Vector3(20,  ground_y, -26), Vector3(-14, ground_y, -36), Vector3(-0.5, ground_y, -36),
+		Vector3(13,  ground_y, -36), Vector3(-0.5, ground_y, -44)
 	]
 	for pos in coverage_positions:
 		var p = StaticBody3D.new()
@@ -94,10 +94,10 @@ func _create_other_players():
 
 	# Blockers (white) — spread between returner and coverage
 	var blocker_positions = [
-		Vector3(-31, ground_y, 3),  Vector3(-24, ground_y, 3),  Vector3(-17, ground_y, 3),
-		Vector3(-10.5, ground_y, 3), Vector3(-4, ground_y, 3),  Vector3(3,   ground_y, 3),
-		Vector3(10,  ground_y, 3),  Vector3(-24, ground_y, 12), Vector3(3,   ground_y, 12),
-		Vector3(-10.5, ground_y, 12)
+		Vector3(-21, ground_y, 9),  Vector3(-14, ground_y, 9),  Vector3(-7, ground_y, 9),
+		Vector3(-0.5, ground_y, 9), Vector3(6,   ground_y, 9),  Vector3(13,  ground_y, 9),
+		Vector3(20,  ground_y, 9),  Vector3(-14, ground_y, 18), Vector3(13,  ground_y, 18),
+		Vector3(-0.5, ground_y, 18)
 	]
 	for pos in blocker_positions:
 		var p = StaticBody3D.new()
