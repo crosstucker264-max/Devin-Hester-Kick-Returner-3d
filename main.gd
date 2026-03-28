@@ -155,14 +155,7 @@ func _physics_process(delta):
 	if Input.is_action_pressed("ui_right"):
 		dir += cam_right
 
-	player.velocity = dir * speed
-	player.move_and_slide()
-
-	# Track player facing direction from movement
-	if dir.length() > 0.1:
-		player_facing = dir.normalized()
-
-	# Camera adjustment controls
+	# Camera adjustment controls (slow and smooth)
 	if Input.is_key_pressed(KEY_W): cam_height += 0.05
 	if Input.is_key_pressed(KEY_S): cam_height -= 0.05
 	if Input.is_key_pressed(KEY_Q): cam_dist -= 0.05
@@ -170,14 +163,13 @@ func _physics_process(delta):
 	if Input.is_key_pressed(KEY_A): cam_side -= 0.05
 	if Input.is_key_pressed(KEY_D): cam_side += 0.05
 
-	# Camera always stays behind player based on movement direction
-	var right = player_facing.cross(Vector3.UP).normalized()
-	var cam_pos = player.position \
-		+ player_facing * cam_dist \
-		+ Vector3.UP * cam_height \
-		+ right * cam_side
-	camera.position = cam_pos
-	camera.look_at(player.position + Vector3.UP, Vector3.UP)
+	# Camera sits at fixed offset behind player — no rotation, no feedback loop
+	camera.position = player.position + Vector3(cam_side, cam_height, cam_dist)
+	camera.look_at(player.position + Vector3(0, 1, 0), Vector3.UP)
+
+	# Player moves based on camera forward/right
+	player.velocity = dir * speed
+	player.move_and_slide()
 
 	# Show position and camera info on screen
 	var p = player.position
