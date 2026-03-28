@@ -7,6 +7,7 @@ var label
 var cam_height = 8.0
 var cam_dist = 15.0
 var cam_side = 0.0
+var player_facing = Vector3(0, 0, 1)
 
 # Field center offset — adjust if stadium model is off center
 var field_center = Vector3(0, 0, 0)
@@ -157,18 +158,26 @@ func _physics_process(delta):
 	player.velocity = dir * speed
 	player.move_and_slide()
 
-	# Camera controls
-	if Input.is_key_pressed(KEY_W): cam_height += 0.1
-	if Input.is_key_pressed(KEY_S): cam_height -= 0.1
-	if Input.is_key_pressed(KEY_Q): cam_dist -= 0.1
-	if Input.is_key_pressed(KEY_E): cam_dist += 0.1
-	if Input.is_key_pressed(KEY_A): cam_side -= 0.1
-	if Input.is_key_pressed(KEY_D): cam_side += 0.1
+	# Track player facing direction from movement
+	if dir.length() > 0.1:
+		player_facing = dir.normalized()
 
-	# Camera locked behind and above returner
-	var cam_offset = Vector3(cam_side, cam_height, cam_dist)
-	camera.position = player.position + cam_offset
-	camera.look_at(player.position, Vector3.UP)
+	# Camera adjustment controls
+	if Input.is_key_pressed(KEY_W): cam_height += 0.05
+	if Input.is_key_pressed(KEY_S): cam_height -= 0.05
+	if Input.is_key_pressed(KEY_Q): cam_dist -= 0.05
+	if Input.is_key_pressed(KEY_E): cam_dist += 0.05
+	if Input.is_key_pressed(KEY_A): cam_side -= 0.05
+	if Input.is_key_pressed(KEY_D): cam_side += 0.05
+
+	# Camera always stays behind player based on movement direction
+	var right = player_facing.cross(Vector3.UP).normalized()
+	var cam_pos = player.position \
+		+ player_facing * cam_dist \
+		+ Vector3.UP * cam_height \
+		+ right * cam_side
+	camera.position = cam_pos
+	camera.look_at(player.position + Vector3.UP, Vector3.UP)
 
 	# Show position and camera info on screen
 	var p = player.position
