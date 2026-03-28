@@ -137,14 +137,22 @@ func _create_lighting():
 func _physics_process(delta):
 	var dir = Vector3.ZERO
 
+	# Get camera forward and right directions (ignore Y axis)
+	var cam_forward = -camera.global_transform.basis.z
+	var cam_right = camera.global_transform.basis.x
+	cam_forward.y = 0
+	cam_right.y = 0
+	cam_forward = cam_forward.normalized()
+	cam_right = cam_right.normalized()
+
 	if Input.is_action_pressed("ui_up"):
-		dir.z -= 1
+		dir += cam_forward
 	if Input.is_action_pressed("ui_down"):
-		dir.z += 1
+		dir -= cam_forward
 	if Input.is_action_pressed("ui_left"):
-		dir.x -= 1
+		dir -= cam_right
 	if Input.is_action_pressed("ui_right"):
-		dir.x += 1
+		dir += cam_right
 
 	player.velocity = dir * speed
 	player.move_and_slide()
