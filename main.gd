@@ -19,6 +19,11 @@ var stamina_drain = 35.0
 var stamina_regen = 18.0
 var exhausted = false   # can't sprint again until stamina recovers to 25
 
+# Defense stamina — invisible, lasts 20% longer, empty = 30% speed penalty
+var def_drain_rate = 35.0 / 1.2   # ~29.2/sec
+var def_regen_rate = 15.0         # regens slowly when blocked/resting
+var kicker_stamina = 100.0
+
 var ground_y = -10.4
 
 # Game phases: overhead, active, touchdown, tackled
@@ -259,7 +264,8 @@ func _create_other_players():
 			"is_blocked": false,
 			"block_timer": 0.0,
 			"block_duration": randf_range(0.5, 4.0),
-			"broke_free": false
+			"broke_free": false,
+			"stamina": 100.0
 		})
 
 	# Kicker at A35 — stored so he can chase after kick
@@ -395,14 +401,19 @@ func _physics_process(delta):
 			var p = cdata.body
 
 			if cdata.is_blocked:
-				# Count down the block — stuck in place
 				cdata.block_timer -= delta
+				# Regen stamina while blocked (resting)
+				cdata.stamina = min(cdata.stamina + def_regen_rate * delta, 100.0)
 				if cdata.block_timer <= 0.0:
 					cdata.is_blocked = false
 					cdata.broke_free = true
-				continue  # can't move while blocked
+				continue
 
-			# Once free (or unblocked gunners), chase returner with lane discipline
+			# Drain stamina while running
+			cdata.stamina = max(cdata.stamina - def_drain_rate * delta, 0.0)
+			# 30% speed penalty when stamina is empty
+			var effective_speed = cdata.speed if cdata.stamina > 0.0 else cdata.speed * 0.7
+
 			var to_returner = player.position - p.position
 			to_returner.y = 0
 			var dist = to_returner.length()
@@ -411,18 +422,19 @@ func _physics_process(delta):
 			var move_dir = (-field_fwd).lerp(to_returner.normalized(), blend).normalized()
 
 			if dist > 1.0:
-				p.position += move_dir * cdata.speed * delta
+				p.position += move_dir * effective_speed * delta
 
-			# Check tackle — blue touches red
 			if dist < 1.5:
 				_tackled()
 				return
 
-		# Kicker chases at 70% speed after the catch
+		# Kicker chases at 70% speed, also has invisible stamina
+		kicker_stamina = max(kicker_stamina - def_drain_rate * delta, 0.0)
+		var effective_kicker_speed = kicker_speed if kicker_stamina > 0.0 else kicker_speed * 0.7
 		var to_player_k = player.position - kicker_body.position
 		to_player_k.y = 0
 		if to_player_k.length() > 1.0:
-			kicker_body.position += to_player_k.normalized() * kicker_speed * delta
+			kicker_body.position += to_player_k.normalized() * effective_kicker_speed * delta
 		elif to_player_k.length() < 1.5:
 			_tackled()
 			return
