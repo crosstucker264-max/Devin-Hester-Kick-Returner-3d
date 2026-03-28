@@ -3,6 +3,7 @@ extends Node3D
 var player
 var camera
 var speed = 10.0
+var label
 
 # Field center offset — adjust if stadium model is off center
 var field_center = Vector3(0, 0, 0)
@@ -14,6 +15,16 @@ func _ready():
 	_create_other_players()
 	_create_camera()
 	_create_lighting()
+	_create_label()
+
+func _create_label():
+	var canvas = CanvasLayer.new()
+	add_child(canvas)
+	label = Label.new()
+	label.position = Vector2(10, 10)
+	label.add_theme_font_size_override("font_size", 20)
+	label.add_theme_color_override("font_color", Color(1, 1, 0))
+	canvas.add_child(label)
 
 func _load_stadium():
 	var stadium_scene = load("res://arabian_knights_football_stadium_arabal.glb")
@@ -139,3 +150,7 @@ func _physics_process(delta):
 	var cam_offset = Vector3(0, 6, 12)
 	camera.position = player.position + cam_offset
 	camera.look_at(player.position + Vector3(0, 0, -10), Vector3.UP)
+
+	# Show position on screen
+	var p = player.position
+	label.text = "X: %.1f  Y: %.1f  Z: %.1f\nUse arrow keys to move\nTell Claude these numbers!" % [p.x, p.y, p.z]
