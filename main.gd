@@ -53,7 +53,7 @@ func _setup_field_vectors():
 	field_fwd = (far_end - near_end).normalized()
 	field_right = Vector3(-field_fwd.z, 0, field_fwd.x)
 	var returner_pos = Vector3(-0.5, ground_y, 28)
-	far_goal_line = returner_pos + field_fwd * 95
+	far_goal_line = returner_pos + field_fwd * 86
 
 func _create_end_zone_marker():
 	var ez_center = far_goal_line + field_fwd * 4.75
@@ -344,7 +344,7 @@ func _physics_process(delta):
 			var dist = to_returner.length()
 
 			var blend = clamp(1.0 - dist / 20.0, 0.0, 1.0) if not cdata.broke_free else 1.0
-			var move_dir = field_fwd.lerp(to_returner.normalized(), blend).normalized()
+			var move_dir = (-field_fwd).lerp(to_returner.normalized(), blend).normalized()
 
 			if dist > 1.0:
 				p.position += move_dir * cdata.speed * delta
