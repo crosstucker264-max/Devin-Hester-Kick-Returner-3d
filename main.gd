@@ -219,7 +219,7 @@ func _create_label():
 	canvas.add_child(try_again_btn)
 
 func _create_crowd():
-	# Load the actual crowd model — 282 low-poly people
+	# Load crowd model to extract individual person meshes
 	var crowd_scene = load("res://crowd.glb")
 	if not crowd_scene:
 		print("ERROR: Could not load crowd.glb!")
@@ -235,70 +235,106 @@ func _create_crowd():
 	for i in range(30):
 		clothing_options.append(Color(0.1, 0.2, 0.8))
 
-	# Place the crowd model along each side of the stadium
-	# The model is a wedge of ~60 degrees of seating, scaled and repeated
+	# Extract individual person meshes from crowd.glb
+	var source = crowd_scene.instantiate()
+	var person_meshes = []
+	_collect_meshes(source, person_meshes)
+	source.queue_free()
+
+	if person_meshes.is_empty():
+		print("ERROR: No meshes found in crowd.glb!")
+		return
+
 	var returner_pos = Vector3(-0.5, ground_y, 28)
-	var field_angle = atan2(field_fwd.x, field_fwd.z)
 
-	# Left sideline — 3 copies along the length
-	for section in range(3):
-		var offset_along = field_fwd * (10.0 + section * 28.0)
-		var offset_side = -field_right * 30.0
-		var pos = returner_pos + offset_along + offset_side
-		pos.y = ground_y - 1.0
-		_place_crowd_section(crowd_scene, pos, field_angle + PI * 0.5, Vector3(25, 12, 25))
+	# Stand geometry: rows rise up from field level
+	# Each row is further from the field and higher up
+	var row_count = 6
+	var row_height_step = 1.8     # each row rises this much
+	var row_depth_step = 1.5      # each row is this much further from field
+	var seat_spacing = 2.0        # space between people along the row
+	var person_scale = Vector3(1.2, 1.2, 1.2)
 
-	# Right sideline — 3 copies along the length
-	for section in range(3):
-		var offset_along = field_fwd * (10.0 + section * 28.0)
-		var offset_side = field_right * 30.0
-		var pos = returner_pos + offset_along + offset_side
-		pos.y = ground_y - 1.0
-		_place_crowd_section(crowd_scene, pos, field_angle - PI * 0.5, Vector3(25, 12, 25))
+	# --- LEFT SIDELINE STANDS ---
+	var side_dist = 28.0          # distance from field center to first row
+	for row in range(row_count):
+		var row_y = ground_y + 2.0 + row * row_height_step
+		var row_side = side_dist + row * row_depth_step
+		var people_per_row = 40
+		for i in range(people_per_row):
+			var along = field_fwd * (-5.0 + i * seat_spacing)
+			var side_offset = -field_right * row_side
+			var pos = returner_pos + along + side_offset
+			pos.y = row_y
+			_place_person(person_meshes, pos, person_scale, true)
 
-	# Near end zone (behind returner)
-	var near_pos = returner_pos - field_fwd * 8.0
-	near_pos.y = ground_y - 1.0
-	_place_crowd_section(crowd_scene, near_pos, field_angle + PI, Vector3(20, 10, 20))
+	# --- RIGHT SIDELINE STANDS ---
+	for row in range(row_count):
+		var row_y = ground_y + 2.0 + row * row_height_step
+		var row_side = side_dist + row * row_depth_step
+		var people_per_row = 40
+		for i in range(people_per_row):
+			var along = field_fwd * (-5.0 + i * seat_spacing)
+			var side_offset = field_right * row_side
+			var pos = returner_pos + along + side_offset
+			pos.y = row_y
+			_place_person(person_meshes, pos, person_scale, false)
 
-	# Far end zone (scoring end zone)
-	var far_pos = returner_pos + field_fwd * 90.0
-	far_pos.y = ground_y - 1.0
-	_place_crowd_section(crowd_scene, far_pos, field_angle, Vector3(20, 10, 20))
+	# --- NEAR END ZONE STANDS (behind returner) ---
+	var end_dist = 12.0
+	for row in range(4):
+		var row_y = ground_y + 2.0 + row * row_height_step
+		var row_back = end_dist + row * row_depth_step
+		var people_per_row = 20
+		for i in range(people_per_row):
+			var side_offset = field_right * (-19.0 + i * seat_spacing)
+			var pos = returner_pos - field_fwd * row_back + side_offset
+			pos.y = row_y
+			_place_person(person_meshes, pos, person_scale, false)
 
-func _place_crowd_section(scene, pos, rot_y, scl):
-	var section = scene.instantiate()
-	section.position = pos
-	section.rotation.y = rot_y
-	section.scale = scl
+	# --- FAR END ZONE STANDS (scoring end) ---
+	for row in range(4):
+		var row_y = ground_y + 2.0 + row * row_height_step
+		var row_back = end_dist + row * row_depth_step
+		var people_per_row = 20
+		for i in range(people_per_row):
+			var side_offset = field_right * (-19.0 + i * seat_spacing)
+			var pos = far_goal_line + field_fwd * row_back + side_offset
+			pos.y = row_y
+			_place_person(person_meshes, pos, person_scale, false)
 
-	# Color the people — apply clothing and skin tones
-	_color_crowd_meshes(section)
-
-	add_child(section)
-
-	# Store all mesh children for cheering animation
-	_register_crowd_for_cheering(section)
-
-func _color_crowd_meshes(node):
+func _collect_meshes(node, result):
 	if node is MeshInstance3D and node.mesh:
-		var mat = StandardMaterial3D.new()
-		# Randomly assign clothing color with the defined ratios
-		mat.albedo_color = clothing_options[randi() % clothing_options.size()]
-		# Blend skin tone into it slightly
-		if randf() < 0.35:
-			mat.albedo_color = mat.albedo_color.lerp(dark_skin_tones[randi() % dark_skin_tones.size()], 0.25)
-		else:
-			mat.albedo_color = mat.albedo_color.lerp(light_skin_tones[randi() % light_skin_tones.size()], 0.15)
-		node.material_override = mat
+		result.append(node.mesh)
 	for child in node.get_children():
-		_color_crowd_meshes(child)
+		_collect_meshes(child, result)
 
-func _register_crowd_for_cheering(node):
-	if node is MeshInstance3D:
-		crowd_members.append({"mesh": node, "base_y": node.global_position.y, "phase": randf() * TAU})
-	for child in node.get_children():
-		_register_crowd_for_cheering(child)
+func _place_person(meshes, pos, scl, face_right):
+	var mesh_inst = MeshInstance3D.new()
+	mesh_inst.mesh = meshes[randi() % meshes.size()]
+	mesh_inst.position = pos
+	mesh_inst.scale = scl
+
+	# Face toward the field center
+	var field_angle = atan2(field_fwd.x, field_fwd.z)
+	if face_right:
+		mesh_inst.rotation.y = field_angle + PI * 0.5
+	else:
+		mesh_inst.rotation.y = field_angle - PI * 0.5
+
+	# Apply random clothing + skin tone color
+	var mat = StandardMaterial3D.new()
+	mat.albedo_color = clothing_options[randi() % clothing_options.size()]
+	if randf() < 0.35:
+		mat.albedo_color = mat.albedo_color.lerp(dark_skin_tones[randi() % dark_skin_tones.size()], 0.25)
+	else:
+		mat.albedo_color = mat.albedo_color.lerp(light_skin_tones[randi() % light_skin_tones.size()], 0.15)
+	mesh_inst.material_override = mat
+
+	add_child(mesh_inst)
+
+	# Register for cheering animation
+	crowd_members.append({"mesh": mesh_inst, "base_y": pos.y, "phase": randf() * TAU})
 
 func _load_stadium():
 	var stadium_scene = load("res://arabian_knights_football_stadium_arabal.glb")
