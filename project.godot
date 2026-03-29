@@ -11,6 +11,7 @@ config_version=5
 [application]
 
 config/name="Devin-Hester-Kick-Returner"
+run/main_scene="res://node_3d.tscn"
 config/features=PackedStringArray("4.6", "Forward Plus")
 config/icon="res://icon.svg"
 
