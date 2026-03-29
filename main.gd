@@ -249,18 +249,18 @@ func _create_crowd():
 	var person_scale = Vector3(1.0, 1.0, 1.0)
 
 	# --- LEFT SIDELINE STANDS (the metal bleachers) ---
-	var side_dist = 38.0          # push far out into the bleacher structure
+	var side_dist = 38.0
 	var row_count = 10
-	var row_height_step = 1.5     # steep rise matching bleacher angle
+	var row_height_step = 0.6     # gentle rise to match bleacher slope
 	var row_depth_step = 0.8
 	var seat_spacing = 2.2
 	for row in range(row_count):
-		var base_y = ground_y + 3.0 + row * row_height_step
+		var base_y = ground_y - 8.0 + row * row_height_step
 		var row_side = side_dist + row * row_depth_step
 		var people_per_row = 35
 		for i in range(people_per_row):
 			if randf() < 0.15:
-				continue  # skip some seats — not every seat filled
+				continue
 			var along = field_fwd * (-5.0 + i * seat_spacing + randf_range(-0.6, 0.6))
 			var side_offset = -field_right * (row_side + randf_range(-0.3, 0.3))
 			var pos = returner_pos + along + side_offset
@@ -270,7 +270,7 @@ func _create_crowd():
 
 	# --- RIGHT SIDELINE STANDS ---
 	for row in range(row_count):
-		var base_y = ground_y + 3.0 + row * row_height_step
+		var base_y = ground_y - 8.0 + row * row_height_step
 		var row_side = side_dist + row * row_depth_step
 		var people_per_row = 35
 		for i in range(people_per_row):
