@@ -252,14 +252,14 @@ func _create_crowd():
 	var person_scale = Vector3(1.0, 1.0, 1.0)
 
 	# --- LEFT SIDELINE STANDS ---
-	# Model data: stands at X=-55 to -73, Y=-11 to -4, rising outward
+	# Raised ON TOP of bleacher seats, not underneath
 	var left_side_start = 55.0
 	var left_rows = 10
-	var left_height_step = 0.7
+	var left_height_step = 0.8
 	var left_depth_step = 2.0
 	var seat_spacing = 2.2
 	for row in range(left_rows):
-		var base_y = -11.0 + row * left_height_step
+		var base_y = -7.0 + row * left_height_step
 		var row_side = left_side_start + row * left_depth_step
 		var people_per_row = 35
 		for i in range(people_per_row):
@@ -268,18 +268,17 @@ func _create_crowd():
 			var along = field_fwd * (-5.0 + i * seat_spacing + randf_range(-0.8, 0.8))
 			var side_offset = -field_right * (row_side + randf_range(-0.5, 0.5))
 			var pos = returner_pos + along + side_offset
-			pos.y = base_y + randf_range(-0.3, 0.3)
+			pos.y = base_y + randf_range(-0.2, 0.2)
 			var scl = person_scale * randf_range(0.85, 1.15)
 			_place_person(person_meshes, pos, scl, true)
 
 	# --- RIGHT SIDELINE STANDS ---
-	# Model data: stands at X=40 to 52, Y=-11 to -6, rising outward
 	var right_side_start = 42.0
 	var right_rows = 8
-	var right_height_step = 0.7
+	var right_height_step = 0.8
 	var right_depth_step = 1.5
 	for row in range(right_rows):
-		var base_y = -11.0 + row * right_height_step
+		var base_y = -7.0 + row * right_height_step
 		var row_side = right_side_start + row * right_depth_step
 		var people_per_row = 35
 		for i in range(people_per_row):
@@ -288,15 +287,15 @@ func _create_crowd():
 			var along = field_fwd * (-5.0 + i * seat_spacing + randf_range(-0.8, 0.8))
 			var side_offset = field_right * (row_side + randf_range(-0.5, 0.5))
 			var pos = returner_pos + along + side_offset
-			pos.y = base_y + randf_range(-0.3, 0.3)
+			pos.y = base_y + randf_range(-0.2, 0.2)
 			var scl = person_scale * randf_range(0.85, 1.15)
 			_place_person(person_meshes, pos, scl, false)
 
 	# --- NEAR END ZONE — scattered fans at field level ---
 	var near_ez = returner_pos - field_fwd * 14.0
-	for _p in range(40):
-		var along_off = randf_range(-18.0, 18.0)
-		var depth_off = randf_range(0.0, 6.0)
+	for _p in range(100):
+		var along_off = randf_range(-24.0, 24.0)
+		var depth_off = randf_range(0.0, 10.0)
 		var pos = near_ez + field_right * along_off - field_fwd * depth_off
 		pos.y = ground_y
 		var scl = person_scale * randf_range(0.85, 1.15)
@@ -304,9 +303,9 @@ func _create_crowd():
 
 	# --- FAR END ZONE — scattered fans at field level ---
 	var far_ez = far_goal_line + field_fwd * 14.0
-	for _p in range(40):
-		var along_off = randf_range(-18.0, 18.0)
-		var depth_off = randf_range(0.0, 6.0)
+	for _p in range(100):
+		var along_off = randf_range(-24.0, 24.0)
+		var depth_off = randf_range(0.0, 10.0)
 		var pos = far_ez + field_right * along_off + field_fwd * depth_off
 		pos.y = ground_y
 		var scl = person_scale * randf_range(0.85, 1.15)
@@ -368,6 +367,7 @@ func _apply_cartoon(node):
 				new_mat.albedo_color = new_mat.albedo_color.lightened(0.15)
 				new_mat.roughness = 1.0
 				new_mat.metallic = 0.0
+				new_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 				node.set_surface_override_material(i, new_mat)
 	for child in node.get_children():
 		_apply_cartoon(child)
@@ -525,7 +525,7 @@ func _physics_process(delta):
 		label.text = "Ball incoming! Run under the yellow circle!\nArrow keys = move"
 
 	elif game_phase == "active":
-		camera.position = player.position + Vector3(cam_side, cam_height, cam_dist)
+		camera.position = player.position - field_fwd * cam_dist + Vector3(0, cam_height, 0) + field_right * cam_side
 		camera.look_at(player.position + Vector3(0, 1, 0), Vector3.UP)
 
 		var cam_forward = -camera.global_transform.basis.z
@@ -584,7 +584,7 @@ func _physics_process(delta):
 		label.text = "Run to the BLUE end zone!\nShift=Sprint  Z=Juke Left  X=Juke Right  C=Spin" + freeze_hint
 
 	elif game_phase == "touchdown" or game_phase == "tackled":
-		camera.position = player.position + Vector3(cam_side, cam_height, cam_dist)
+		camera.position = player.position - field_fwd * cam_dist + Vector3(0, cam_height, 0) + field_right * cam_side
 		camera.look_at(player.position + Vector3(0, 1, 0), Vector3.UP)
 
 	# Crowd cheering animation — always active in all phases
