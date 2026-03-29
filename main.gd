@@ -250,14 +250,13 @@ func _create_crowd():
 	var seat_spacing = 2.0
 
 	# --- LEFT SIDELINE STANDS ---
-	# Stadium stands are built into the model; place people sitting in them
-	# Stands start close to field level and rise in rows
+	# Place people in the stadium's built-in stands
 	var side_dist = 26.0
 	var row_count = 8
-	var row_height_step = 1.2
-	var row_depth_step = 1.3
+	var row_height_step = 1.0
+	var row_depth_step = 1.2
 	for row in range(row_count):
-		var row_y = ground_y + 0.5 + row * row_height_step
+		var row_y = ground_y - 4.0 + row * row_height_step
 		var row_side = side_dist + row * row_depth_step
 		var people_per_row = 38
 		for i in range(people_per_row):
@@ -269,7 +268,7 @@ func _create_crowd():
 
 	# --- RIGHT SIDELINE STANDS ---
 	for row in range(row_count):
-		var row_y = ground_y + 0.5 + row * row_height_step
+		var row_y = ground_y - 4.0 + row * row_height_step
 		var row_side = side_dist + row * row_depth_step
 		var people_per_row = 38
 		for i in range(people_per_row):
@@ -286,7 +285,7 @@ func _create_crowd():
 			var side_offset = field_right * (-15.0 + i * 2.0)
 			var depth_offset = -field_fwd * (row * 1.5)
 			var pos = near_ez + side_offset + depth_offset
-			pos.y = ground_y
+			pos.y = ground_y - 4.0
 			_place_person(person_meshes, pos, person_scale, false)
 
 	# --- FAR END ZONE — fans at field level behind the scoring end zone ---
@@ -296,7 +295,7 @@ func _create_crowd():
 			var side_offset = field_right * (-15.0 + i * 2.0)
 			var depth_offset = field_fwd * (row * 1.5)
 			var pos = far_ez + side_offset + depth_offset
-			pos.y = ground_y
+			pos.y = ground_y - 4.0
 			_place_person(person_meshes, pos, person_scale, false)
 
 func _collect_meshes(node, result):
@@ -311,12 +310,15 @@ func _place_person(meshes, pos, scl, face_right):
 	mesh_inst.position = pos
 	mesh_inst.scale = scl
 
-	# Face toward the field
+	# Stand upright first (model may be Z-up from GLB export)
+	mesh_inst.rotation.x = -PI * 0.5
+
+	# Then face toward the field
 	var field_angle = atan2(field_fwd.x, field_fwd.z)
 	if face_right:
-		mesh_inst.rotation.y = field_angle + PI * 0.5
+		mesh_inst.rotation.z = field_angle + PI * 0.5
 	else:
-		mesh_inst.rotation.y = field_angle - PI * 0.5
+		mesh_inst.rotation.z = field_angle - PI * 0.5
 
 	# Apply random clothing + skin tone color
 	var mat = StandardMaterial3D.new()
