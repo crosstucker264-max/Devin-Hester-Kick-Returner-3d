@@ -219,10 +219,10 @@ func _create_label():
 	canvas.add_child(try_again_btn)
 
 func _create_crowd():
-	# Load crowd model to extract individual person meshes
-	var crowd_scene = load("res://crowd.glb")
-	if not crowd_scene:
-		print("ERROR: Could not load crowd.glb!")
+	# Load the lowpoly people model
+	var people_scene = load("res://lowpoly_people__waldo.glb")
+	if not people_scene:
+		print("ERROR: Could not load lowpoly_people__waldo.glb!")
 		return
 
 	# Build clothing color table: 10% white, 10% black, 50% red, 30% blue
@@ -235,32 +235,31 @@ func _create_crowd():
 	for i in range(30):
 		clothing_options.append(Color(0.1, 0.2, 0.8))
 
-	# Extract individual person meshes from crowd.glb
-	var source = crowd_scene.instantiate()
+	# Extract person meshes from the model
+	var source = people_scene.instantiate()
 	var person_meshes = []
 	_collect_meshes(source, person_meshes)
 	source.queue_free()
 
 	if person_meshes.is_empty():
-		print("ERROR: No meshes found in crowd.glb!")
+		print("ERROR: No meshes found in lowpoly_people__waldo.glb!")
 		return
 
 	var returner_pos = Vector3(-0.5, ground_y, 28)
-
-	# Stand geometry: rows rise up from field level
-	# Each row is further from the field and higher up
-	var row_count = 6
-	var row_height_step = 1.8     # each row rises this much
-	var row_depth_step = 1.5      # each row is this much further from field
-	var seat_spacing = 2.0        # space between people along the row
-	var person_scale = Vector3(1.2, 1.2, 1.2)
+	var person_scale = Vector3(1.0, 1.0, 1.0)
+	var seat_spacing = 2.0
 
 	# --- LEFT SIDELINE STANDS ---
-	var side_dist = 28.0          # distance from field center to first row
+	# Stadium stands are built into the model; place people sitting in them
+	# Stands start close to field level and rise in rows
+	var side_dist = 26.0
+	var row_count = 8
+	var row_height_step = 1.2
+	var row_depth_step = 1.3
 	for row in range(row_count):
-		var row_y = ground_y + 2.0 + row * row_height_step
+		var row_y = ground_y + 0.5 + row * row_height_step
 		var row_side = side_dist + row * row_depth_step
-		var people_per_row = 40
+		var people_per_row = 38
 		for i in range(people_per_row):
 			var along = field_fwd * (-5.0 + i * seat_spacing)
 			var side_offset = -field_right * row_side
@@ -270,9 +269,9 @@ func _create_crowd():
 
 	# --- RIGHT SIDELINE STANDS ---
 	for row in range(row_count):
-		var row_y = ground_y + 2.0 + row * row_height_step
+		var row_y = ground_y + 0.5 + row * row_height_step
 		var row_side = side_dist + row * row_depth_step
-		var people_per_row = 40
+		var people_per_row = 38
 		for i in range(people_per_row):
 			var along = field_fwd * (-5.0 + i * seat_spacing)
 			var side_offset = field_right * row_side
@@ -280,27 +279,24 @@ func _create_crowd():
 			pos.y = row_y
 			_place_person(person_meshes, pos, person_scale, false)
 
-	# --- NEAR END ZONE STANDS (behind returner) ---
-	var end_dist = 12.0
-	for row in range(4):
-		var row_y = ground_y + 2.0 + row * row_height_step
-		var row_back = end_dist + row * row_depth_step
-		var people_per_row = 20
-		for i in range(people_per_row):
-			var side_offset = field_right * (-19.0 + i * seat_spacing)
-			var pos = returner_pos - field_fwd * row_back + side_offset
-			pos.y = row_y
+	# --- NEAR END ZONE — fans at field level behind the end zone ---
+	var near_ez = returner_pos - field_fwd * 14.0
+	for row in range(3):
+		for i in range(16):
+			var side_offset = field_right * (-15.0 + i * 2.0)
+			var depth_offset = -field_fwd * (row * 1.5)
+			var pos = near_ez + side_offset + depth_offset
+			pos.y = ground_y
 			_place_person(person_meshes, pos, person_scale, false)
 
-	# --- FAR END ZONE STANDS (scoring end) ---
-	for row in range(4):
-		var row_y = ground_y + 2.0 + row * row_height_step
-		var row_back = end_dist + row * row_depth_step
-		var people_per_row = 20
-		for i in range(people_per_row):
-			var side_offset = field_right * (-19.0 + i * seat_spacing)
-			var pos = far_goal_line + field_fwd * row_back + side_offset
-			pos.y = row_y
+	# --- FAR END ZONE — fans at field level behind the scoring end zone ---
+	var far_ez = far_goal_line + field_fwd * 14.0
+	for row in range(3):
+		for i in range(16):
+			var side_offset = field_right * (-15.0 + i * 2.0)
+			var depth_offset = field_fwd * (row * 1.5)
+			var pos = far_ez + side_offset + depth_offset
+			pos.y = ground_y
 			_place_person(person_meshes, pos, person_scale, false)
 
 func _collect_meshes(node, result):
@@ -315,7 +311,7 @@ func _place_person(meshes, pos, scl, face_right):
 	mesh_inst.position = pos
 	mesh_inst.scale = scl
 
-	# Face toward the field center
+	# Face toward the field
 	var field_angle = atan2(field_fwd.x, field_fwd.z)
 	if face_right:
 		mesh_inst.rotation.y = field_angle + PI * 0.5
