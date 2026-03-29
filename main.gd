@@ -247,56 +247,61 @@ func _create_crowd():
 
 	var returner_pos = Vector3(-0.5, ground_y, 28)
 	var person_scale = Vector3(1.0, 1.0, 1.0)
-	var seat_spacing = 2.0
 
-	# --- LEFT SIDELINE STANDS ---
-	# Place people in the stadium's built-in stands
-	var side_dist = 26.0
-	var row_count = 8
-	var row_height_step = 1.0
-	var row_depth_step = 1.2
+	# --- LEFT SIDELINE STANDS (the metal bleachers) ---
+	var side_dist = 38.0          # push far out into the bleacher structure
+	var row_count = 10
+	var row_height_step = 1.5     # steep rise matching bleacher angle
+	var row_depth_step = 0.8
+	var seat_spacing = 2.2
 	for row in range(row_count):
-		var row_y = ground_y - 4.0 + row * row_height_step
+		var base_y = ground_y + 3.0 + row * row_height_step
 		var row_side = side_dist + row * row_depth_step
-		var people_per_row = 38
+		var people_per_row = 35
 		for i in range(people_per_row):
-			var along = field_fwd * (-5.0 + i * seat_spacing)
-			var side_offset = -field_right * row_side
+			if randf() < 0.15:
+				continue  # skip some seats — not every seat filled
+			var along = field_fwd * (-5.0 + i * seat_spacing + randf_range(-0.6, 0.6))
+			var side_offset = -field_right * (row_side + randf_range(-0.3, 0.3))
 			var pos = returner_pos + along + side_offset
-			pos.y = row_y
-			_place_person(person_meshes, pos, person_scale, true)
+			pos.y = base_y + randf_range(-0.2, 0.2)
+			var scl = person_scale * randf_range(0.85, 1.15)
+			_place_person(person_meshes, pos, scl, true)
 
 	# --- RIGHT SIDELINE STANDS ---
 	for row in range(row_count):
-		var row_y = ground_y - 4.0 + row * row_height_step
+		var base_y = ground_y + 3.0 + row * row_height_step
 		var row_side = side_dist + row * row_depth_step
-		var people_per_row = 38
+		var people_per_row = 35
 		for i in range(people_per_row):
-			var along = field_fwd * (-5.0 + i * seat_spacing)
-			var side_offset = field_right * row_side
+			if randf() < 0.15:
+				continue
+			var along = field_fwd * (-5.0 + i * seat_spacing + randf_range(-0.6, 0.6))
+			var side_offset = field_right * (row_side + randf_range(-0.3, 0.3))
 			var pos = returner_pos + along + side_offset
-			pos.y = row_y
-			_place_person(person_meshes, pos, person_scale, false)
+			pos.y = base_y + randf_range(-0.2, 0.2)
+			var scl = person_scale * randf_range(0.85, 1.15)
+			_place_person(person_meshes, pos, scl, false)
 
-	# --- NEAR END ZONE — fans at field level behind the end zone ---
+	# --- NEAR END ZONE — scattered fans at field level ---
 	var near_ez = returner_pos - field_fwd * 14.0
-	for row in range(3):
-		for i in range(16):
-			var side_offset = field_right * (-15.0 + i * 2.0)
-			var depth_offset = -field_fwd * (row * 1.5)
-			var pos = near_ez + side_offset + depth_offset
-			pos.y = ground_y - 4.0
-			_place_person(person_meshes, pos, person_scale, false)
+	for _p in range(40):
+		var along_off = randf_range(-18.0, 18.0)
+		var depth_off = randf_range(0.0, 6.0)
+		var pos = near_ez + field_right * along_off - field_fwd * depth_off
+		pos.y = ground_y
+		var scl = person_scale * randf_range(0.85, 1.15)
+		_place_person(person_meshes, pos, scl, false)
 
-	# --- FAR END ZONE — fans at field level behind the scoring end zone ---
+	# --- FAR END ZONE — scattered fans at field level ---
 	var far_ez = far_goal_line + field_fwd * 14.0
-	for row in range(3):
-		for i in range(16):
-			var side_offset = field_right * (-15.0 + i * 2.0)
-			var depth_offset = field_fwd * (row * 1.5)
-			var pos = far_ez + side_offset + depth_offset
-			pos.y = ground_y - 4.0
-			_place_person(person_meshes, pos, person_scale, false)
+	for _p in range(40):
+		var along_off = randf_range(-18.0, 18.0)
+		var depth_off = randf_range(0.0, 6.0)
+		var pos = far_ez + field_right * along_off + field_fwd * depth_off
+		pos.y = ground_y
+		var scl = person_scale * randf_range(0.85, 1.15)
+		_place_person(person_meshes, pos, scl, false)
 
 func _collect_meshes(node, result):
 	if node is MeshInstance3D and node.mesh:
@@ -313,12 +318,13 @@ func _place_person(meshes, pos, scl, face_right):
 	# Stand upright first (model may be Z-up from GLB export)
 	mesh_inst.rotation.x = -PI * 0.5
 
-	# Then face toward the field
+	# Face toward the field with slight random variation
 	var field_angle = atan2(field_fwd.x, field_fwd.z)
+	var jitter = randf_range(-0.3, 0.3)
 	if face_right:
-		mesh_inst.rotation.z = field_angle + PI * 0.5
+		mesh_inst.rotation.z = field_angle + PI * 0.5 + jitter
 	else:
-		mesh_inst.rotation.z = field_angle - PI * 0.5
+		mesh_inst.rotation.z = field_angle - PI * 0.5 + jitter
 
 	# Apply random clothing + skin tone color
 	var mat = StandardMaterial3D.new()
