@@ -253,10 +253,10 @@ func _create_crowd():
 
 	# --- LEFT SIDELINE STANDS ---
 	# Raised ON TOP of bleacher seats, not underneath
-	var left_side_start = 55.0
-	var left_rows = 10
-	var left_height_step = 0.8
-	var left_depth_step = 2.0
+	var left_side_start = 52.0
+	var left_rows = 6
+	var left_height_step = 0.5
+	var left_depth_step = 1.0
 	var seat_spacing = 2.2
 	for row in range(left_rows):
 		var base_y = -7.0 + row * left_height_step
@@ -273,10 +273,10 @@ func _create_crowd():
 			_place_person(person_meshes, pos, scl, true)
 
 	# --- RIGHT SIDELINE STANDS ---
-	var right_side_start = 42.0
-	var right_rows = 8
-	var right_height_step = 0.8
-	var right_depth_step = 1.5
+	var right_side_start = 40.0
+	var right_rows = 6
+	var right_height_step = 0.5
+	var right_depth_step = 1.0
 	for row in range(right_rows):
 		var base_y = -7.0 + row * right_height_step
 		var row_side = right_side_start + row * right_depth_step
