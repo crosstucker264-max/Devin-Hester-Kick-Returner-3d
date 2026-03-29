@@ -364,10 +364,23 @@ func _apply_cartoon(node):
 			var mat = node.get_active_material(i)
 			if mat is StandardMaterial3D:
 				var new_mat = mat.duplicate()
-				new_mat.albedo_color = new_mat.albedo_color.lightened(0.15)
-				new_mat.roughness = 1.0
-				new_mat.metallic = 0.0
 				new_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+				# Detect metal/concrete surfaces by color brightness
+				var brightness = new_mat.albedo_color.get_luminance()
+				if brightness > 0.6:
+					# Light surfaces (metal bleachers, concrete) — slight metallic sheen
+					new_mat.roughness = 0.4
+					new_mat.metallic = 0.3
+					new_mat.albedo_color = new_mat.albedo_color.lightened(0.05)
+				elif brightness < 0.25:
+					# Dark surfaces (seats, rails) — clean matte
+					new_mat.roughness = 0.6
+					new_mat.metallic = 0.1
+				else:
+					# Mid-tone surfaces (field, track, etc.)
+					new_mat.roughness = 0.7
+					new_mat.metallic = 0.0
+					new_mat.albedo_color = new_mat.albedo_color.lightened(0.08)
 				node.set_surface_override_material(i, new_mat)
 	for child in node.get_children():
 		_apply_cartoon(child)
@@ -468,25 +481,34 @@ func _create_camera():
 	camera.look_at(Vector3(-0.5, ground_y, 28), Vector3(0, 0, -1))
 
 func _create_lighting():
+	# Main sun light — strong and directional
 	var light = DirectionalLight3D.new()
-	light.rotation_degrees = Vector3(-60, 30, 0)
-	light.light_energy = 1.2
-	light.shadow_enabled = false
+	light.rotation_degrees = Vector3(-50, 30, 0)
+	light.light_energy = 1.5
+	light.light_color = Color(1.0, 0.98, 0.95)
+	light.shadow_enabled = true
+	light.shadow_bias = 0.05
 	add_child(light)
+	# Fill light — softer from opposite side
 	var fill = DirectionalLight3D.new()
 	fill.rotation_degrees = Vector3(-30, 210, 0)
-	fill.light_energy = 0.6
+	fill.light_energy = 0.4
+	fill.light_color = Color(0.85, 0.9, 1.0)
 	fill.shadow_enabled = false
 	add_child(fill)
 	var env = Environment.new()
 	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color(0.35, 0.65, 1.0)
+	env.background_color = Color(0.4, 0.7, 1.0)
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(0.9, 0.95, 1.0)
-	env.ambient_light_energy = 1.5
+	env.ambient_light_color = Color(0.85, 0.88, 0.95)
+	env.ambient_light_energy = 0.8
+	env.tonemap_mode = Environment.TONE_MAP_ACES
+	env.ssao_enabled = true
+	env.ssao_radius = 2.0
+	env.ssao_intensity = 1.0
 	env.glow_enabled = true
-	env.glow_intensity = 0.3
-	env.glow_bloom = 0.1
+	env.glow_intensity = 0.15
+	env.glow_bloom = 0.05
 	var world_env = WorldEnvironment.new()
 	world_env.environment = env
 	add_child(world_env)
