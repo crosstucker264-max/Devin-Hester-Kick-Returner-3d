@@ -280,7 +280,11 @@ func _create_other_players():
 		p.add_child(_make_player_mesh(Color(0.1, 0.2, 0.8)))
 		add_child(p)
 		# Gunners (outer) fastest; inner players slightly faster to cut off gaps
-		var spd = coverage_speed + 1.5 if abs(offset) >= 18.0 else (coverage_speed + 0.5 if abs(offset) <= 3.0 else coverage_speed)
+		var spd = coverage_speed
+		if abs(offset) >= 18.0:
+			spd = coverage_speed + 1.5
+		elif abs(offset) <= 3.0:
+			spd = coverage_speed + 0.5
 		coverage_data.append({
 			"body": p,
 			"lane_offset": offset,
@@ -303,6 +307,7 @@ func _create_other_players():
 
 func _create_camera():
 	camera = Camera3D.new()
+	camera.current = true
 	add_child(camera)
 
 func _create_lighting():
