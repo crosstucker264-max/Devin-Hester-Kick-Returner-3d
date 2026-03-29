@@ -62,16 +62,27 @@ var blocker_data = []
 var blocker_speed = 6.5
 
 func _ready():
+	print("GAME: Starting _ready")
 	_setup_field_vectors()
+	print("GAME: field vectors done")
 	_load_stadium()
+	print("GAME: stadium loaded")
 	_create_player()
+	print("GAME: player created")
 	_create_other_players()
+	print("GAME: other players created")
 	_create_ball_circle()
+	print("GAME: ball circle created")
 	_create_football()
+	print("GAME: football created")
 	_create_end_zone_marker()
+	print("GAME: end zone created")
 	_create_camera()
+	print("GAME: camera created")
 	_create_lighting()
+	print("GAME: lighting created")
 	_create_label()
+	print("GAME: ALL DONE - ready complete")
 
 func _setup_field_vectors():
 	var near_end = Vector3(3, 0, 41)
