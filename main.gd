@@ -4,9 +4,9 @@ var player
 var camera
 var label
 var big_label
-var stamina_bar_bg: ColorRect
-var stamina_bar_fill: ColorRect
-var try_again_btn: Button
+var stamina_bar_bg
+var stamina_bar_fill
+var try_again_btn
 
 var cam_height = 5.2
 var cam_dist = 9.7
