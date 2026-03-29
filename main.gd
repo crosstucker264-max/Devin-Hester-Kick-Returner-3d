@@ -347,8 +347,18 @@ func _load_stadium():
 		add_child(stadium)
 		await get_tree().process_frame
 		_apply_cartoon(stadium)
+		_debug_stadium(stadium)
 	else:
 		print("ERROR: Could not load stadium file!")
+
+func _debug_stadium(node, depth = 0):
+	if node is MeshInstance3D and node.mesh:
+		var aabb = node.mesh.get_aabb()
+		var global_pos = node.global_position
+		var name = node.name
+		print("MESH: %s | pos: %s | aabb_pos: %s | aabb_size: %s" % [name, global_pos, aabb.position, aabb.size])
+	for child in node.get_children():
+		_debug_stadium(child, depth + 1)
 
 func _apply_cartoon(node):
 	if node is MeshInstance3D and node.mesh:
