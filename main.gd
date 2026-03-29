@@ -307,8 +307,11 @@ func _create_other_players():
 
 func _create_camera():
 	camera = Camera3D.new()
-	camera.current = true
 	add_child(camera)
+	camera.current = true
+	# Set initial position so first frame isn't blank
+	camera.position = Vector3(-0.5, ground_y + 22, 28)
+	camera.look_at(Vector3(-0.5, ground_y, 28), Vector3(0, 0, -1))
 
 func _create_lighting():
 	var light = DirectionalLight3D.new()
