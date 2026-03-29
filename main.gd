@@ -63,12 +63,25 @@ var blocker_speed = 6.5
 
 # Crowd
 var crowd_members = []
-var crowd_colors = [
-	Color(0.9, 0.1, 0.1),   # red
-	Color(0.1, 0.2, 0.8),   # blue
-	Color(0.95, 0.95, 0.95), # white
-	Color(0.1, 0.1, 0.1)    # black
+
+# Skin tones — realistic shades of brown
+var dark_skin_tones = [
+	Color(0.24, 0.15, 0.10),  # deep ebony
+	Color(0.33, 0.22, 0.14),  # dark brown
+	Color(0.44, 0.30, 0.20),  # brown
+	Color(0.55, 0.38, 0.26),  # caramel
+	Color(0.62, 0.44, 0.30),  # warm tan
 ]
+var light_skin_tones = [
+	Color(0.96, 0.84, 0.74),  # light peach
+	Color(0.92, 0.78, 0.65),  # peach
+	Color(0.87, 0.72, 0.58),  # light beige
+	Color(0.80, 0.67, 0.52),  # golden tan
+	Color(0.76, 0.62, 0.48),  # olive tan
+]
+
+# Clothing: 10% white, 10% black, 50% returner red, 30% other team blue
+var clothing_options = []
 
 func _ready():
 	_setup_field_vectors()
@@ -206,24 +219,25 @@ func _create_label():
 	canvas.add_child(try_again_btn)
 
 func _create_crowd():
-	# Load the crowd model to use as a template for individual fans
-	var crowd_scene = load("res://crowd.glb")
-	if not crowd_scene:
-		print("ERROR: Could not load crowd file!")
-		return
+	# Build clothing color table: 10% white, 10% black, 50% red, 30% blue
+	for i in range(10):
+		clothing_options.append(Color(0.95, 0.95, 0.95))  # white
+	for i in range(10):
+		clothing_options.append(Color(0.1, 0.1, 0.1))      # black
+	for i in range(50):
+		clothing_options.append(Color(0.8, 0.1, 0.1))      # red (returner team)
+	for i in range(30):
+		clothing_options.append(Color(0.1, 0.2, 0.8))      # blue (other team)
 
-	# Stadium stand positions — fans placed along sidelines and end zones
-	# Using field_fwd and field_right to align with the diagonal field
 	var returner_pos = Vector3(-0.5, ground_y, 28)
 
-	# Side stands: run along the length of the field
 	# Left sideline stands
 	for row in range(4):
 		for i in range(30):
 			var dist_along = 5.0 + i * 3.0
 			var pos = returner_pos + field_fwd * dist_along - field_right * (28.0 + row * 2.5)
 			pos.y = ground_y + 2.0 + row * 1.8
-			_place_fan(pos, row)
+			_place_fan(pos)
 
 	# Right sideline stands
 	for row in range(4):
@@ -231,7 +245,7 @@ func _create_crowd():
 			var dist_along = 5.0 + i * 3.0
 			var pos = returner_pos + field_fwd * dist_along + field_right * (28.0 + row * 2.5)
 			pos.y = ground_y + 2.0 + row * 1.8
-			_place_fan(pos, row)
+			_place_fan(pos)
 
 	# Near end zone stands (behind returner)
 	for row in range(3):
@@ -239,7 +253,7 @@ func _create_crowd():
 			var side = (i - 7.0) * 3.5
 			var pos = returner_pos - field_fwd * (5.0 + row * 2.5) + field_right * side
 			pos.y = ground_y + 2.0 + row * 1.8
-			_place_fan(pos, row)
+			_place_fan(pos)
 
 	# Far end zone stands (behind scoring end zone)
 	for row in range(3):
@@ -247,21 +261,40 @@ func _create_crowd():
 			var side = (i - 7.0) * 3.5
 			var pos = returner_pos + field_fwd * (92.0 + row * 2.5) + field_right * side
 			pos.y = ground_y + 2.0 + row * 1.8
-			_place_fan(pos, row)
+			_place_fan(pos)
 
-func _place_fan(pos, row):
-	var fan = MeshInstance3D.new()
-	var cap = CapsuleMesh.new()
-	cap.radius = 0.3
-	cap.height = 1.2
-	fan.mesh = cap
-	var mat = StandardMaterial3D.new()
-	mat.albedo_color = crowd_colors[randi() % crowd_colors.size()]
-	fan.material_override = mat
-	fan.position = pos
-	add_child(fan)
-	# Store for cheering animation with random offset so they don't all sync
-	crowd_members.append({"mesh": fan, "base_y": pos.y, "phase": randf() * TAU})
+func _place_fan(pos):
+	var fan_root = Node3D.new()
+	fan_root.position = pos
+
+	# Body (clothing)
+	var body = MeshInstance3D.new()
+	var body_mesh = CapsuleMesh.new()
+	body_mesh.radius = 0.3
+	body_mesh.height = 1.0
+	body.mesh = body_mesh
+	var body_mat = StandardMaterial3D.new()
+	body_mat.albedo_color = clothing_options[randi() % clothing_options.size()]
+	body.material_override = body_mat
+	body.position.y = 0.0
+	fan_root.add_child(body)
+
+	# Head (skin tone) — 35% dark, 65% light
+	var head = MeshInstance3D.new()
+	var head_mesh = SphereMesh.new()
+	head_mesh.radius = 0.2
+	head.mesh = head_mesh
+	var head_mat = StandardMaterial3D.new()
+	if randf() < 0.35:
+		head_mat.albedo_color = dark_skin_tones[randi() % dark_skin_tones.size()]
+	else:
+		head_mat.albedo_color = light_skin_tones[randi() % light_skin_tones.size()]
+	head.material_override = head_mat
+	head.position.y = 0.7
+	fan_root.add_child(head)
+
+	add_child(fan_root)
+	crowd_members.append({"mesh": fan_root, "base_y": pos.y, "phase": randf() * TAU})
 
 func _load_stadium():
 	var stadium_scene = load("res://arabian_knights_football_stadium_arabal.glb")
