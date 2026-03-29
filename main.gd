@@ -64,6 +64,9 @@ var blocker_speed = 6.5
 # Crowd
 var crowd_members = []
 
+# Freeze mode — P to pause all other players
+var freeze_others = false
+
 # Skin tones — realistic shades of brown
 var dark_skin_tones = [
 	Color(0.24, 0.15, 0.10),  # deep ebony
@@ -569,81 +572,16 @@ func _physics_process(delta):
 		else:
 			stamina_bar_fill.color = Color(0.9, 0.1, 0.1)
 
-		# Blockers run toward their assigned coverage player
-		for bdata in blocker_data:
-			var b = bdata.body
-			var cdata = coverage_data[bdata.target_index]
-			# Only pursue if coverage hasn't broken free
-			if not cdata.broke_free:
-				var to_target = cdata.body.position - b.position
-				to_target.y = 0
-				if to_target.length() > 1.5:
-					b.position += to_target.normalized() * blocker_speed * delta
-				else:
-					# Close enough — trigger the block
-					if not cdata.is_blocked:
-						cdata.is_blocked = true
-						cdata.block_timer = cdata.block_duration
-
-		# Coverage movement — blocked by white, then break free and chase returner
-		for cdata in coverage_data:
-			var p = cdata.body
-
-			if cdata.is_blocked:
-				cdata.block_timer -= delta
-				# Regen stamina while blocked (resting)
-				cdata.stamina = min(cdata.stamina + def_regen_rate * delta, 100.0)
-				if cdata.block_timer <= 0.0:
-					cdata.is_blocked = false
-					cdata.broke_free = true
-				continue
-
-			# Drain stamina while running
-			cdata.stamina = max(cdata.stamina - def_drain_rate * delta, 0.0)
-			# 30% speed penalty when stamina is empty
-			var effective_speed = cdata.speed if cdata.stamina > 0.0 else cdata.speed * 0.7
-
-			var to_returner = player.position - p.position
-			to_returner.y = 0
-			var dist = to_returner.length()
-
-			# Inner players (small lane offset) cut off angles — aim ahead of returner
-			var target_pos = player.position
-			if abs(cdata.lane_offset) <= 3.0 and not cdata.broke_free:
-				# Predict where returner will be and cut off the lane
-				target_pos = player.position + (player.velocity.normalized() * 3.0)
-				target_pos.y = p.position.y
-
-			var to_target = target_pos - p.position
-			to_target.y = 0
-
-			var blend = clamp(1.0 - dist / 20.0, 0.0, 1.0) if not cdata.broke_free else 1.0
-			var move_dir = (-field_fwd).lerp(to_target.normalized(), blend).normalized()
-
-			if dist > 1.0:
-				p.position += move_dir * effective_speed * delta
-
-			if dist < 1.5 and spin_invincible_timer <= 0.0:
-				_tackled()
-				return
-
-		# Kicker chases at 70% speed, also has invisible stamina
-		kicker_stamina = max(kicker_stamina - def_drain_rate * delta, 0.0)
-		var effective_kicker_speed = kicker_speed if kicker_stamina > 0.0 else kicker_speed * 0.7
-		var to_player_k = player.position - kicker_body.position
-		to_player_k.y = 0
-		if to_player_k.length() > 1.0:
-			kicker_body.position += to_player_k.normalized() * effective_kicker_speed * delta
-		elif to_player_k.length() < 1.5 and spin_invincible_timer <= 0.0:
-			_tackled()
-			return
+		if not freeze_others:
+			_move_ai_players(delta)
 
 		# Check touchdown — returner crosses far goal line
 		var past_goal = (player.position - far_goal_line).dot(field_fwd)
 		if past_goal > 0:
 			_touchdown()
 
-		label.text = "Run to the BLUE end zone!\nShift=Sprint  Z=Juke Left  X=Juke Right  C=Spin"
+		var freeze_hint = "  P=Freeze" if not freeze_others else "  P=Unfreeze"
+		label.text = "Run to the BLUE end zone!\nShift=Sprint  Z=Juke Left  X=Juke Right  C=Spin" + freeze_hint
 
 	elif game_phase == "touchdown" or game_phase == "tackled":
 		camera.position = player.position + Vector3(cam_side, cam_height, cam_dist)
@@ -658,11 +596,13 @@ func _physics_process(delta):
 		m.position.y = c.base_y + abs(bob) * 0.3
 
 func _unhandled_key_input(event):
+	if not event.pressed or event.is_echo():
+		return
+	# P toggles freeze on all other players
+	if event.keycode == KEY_P:
+		freeze_others = not freeze_others
+		return
 	if game_phase != "active":
-		return
-	if not event.pressed:
-		return
-	if event.is_echo():
 		return
 	var key = event.keycode
 	if key == KEY_Z and stamina >= JUKE_COST:
@@ -678,6 +618,69 @@ func _unhandled_key_input(event):
 		stamina -= SPIN_COST
 		spin_invincible_timer = 0.45
 		move_recovery_timer = 0.2
+
+func _move_ai_players(delta):
+	# Blockers run toward their assigned coverage player
+	for bdata in blocker_data:
+		var b = bdata.body
+		var cdata = coverage_data[bdata.target_index]
+		if not cdata.broke_free:
+			var to_target = cdata.body.position - b.position
+			to_target.y = 0
+			if to_target.length() > 1.5:
+				b.position += to_target.normalized() * blocker_speed * delta
+			else:
+				if not cdata.is_blocked:
+					cdata.is_blocked = true
+					cdata.block_timer = cdata.block_duration
+
+	# Coverage movement — blocked by white, then break free and chase returner
+	for cdata in coverage_data:
+		var p = cdata.body
+
+		if cdata.is_blocked:
+			cdata.block_timer -= delta
+			cdata.stamina = min(cdata.stamina + def_regen_rate * delta, 100.0)
+			if cdata.block_timer <= 0.0:
+				cdata.is_blocked = false
+				cdata.broke_free = true
+			continue
+
+		cdata.stamina = max(cdata.stamina - def_drain_rate * delta, 0.0)
+		var effective_speed = cdata.speed if cdata.stamina > 0.0 else cdata.speed * 0.7
+
+		var to_returner = player.position - p.position
+		to_returner.y = 0
+		var dist = to_returner.length()
+
+		var target_pos = player.position
+		if abs(cdata.lane_offset) <= 3.0 and not cdata.broke_free:
+			target_pos = player.position + (player.velocity.normalized() * 3.0)
+			target_pos.y = p.position.y
+
+		var to_target = target_pos - p.position
+		to_target.y = 0
+
+		var blend = clamp(1.0 - dist / 20.0, 0.0, 1.0) if not cdata.broke_free else 1.0
+		var move_dir = (-field_fwd).lerp(to_target.normalized(), blend).normalized()
+
+		if dist > 1.0:
+			p.position += move_dir * effective_speed * delta
+
+		if dist < 1.5 and spin_invincible_timer <= 0.0:
+			_tackled()
+			return
+
+	# Kicker chases at 70% speed
+	kicker_stamina = max(kicker_stamina - def_drain_rate * delta, 0.0)
+	var effective_kicker_speed = kicker_speed if kicker_stamina > 0.0 else kicker_speed * 0.7
+	var to_player_k = player.position - kicker_body.position
+	to_player_k.y = 0
+	if to_player_k.length() > 1.0:
+		kicker_body.position += to_player_k.normalized() * effective_kicker_speed * delta
+	elif to_player_k.length() < 1.5 and spin_invincible_timer <= 0.0:
+		_tackled()
+		return
 
 func _catch_ball():
 	game_phase = "active"
