@@ -83,7 +83,7 @@ func _setup_field_vectors():
 
 func _create_end_zone_marker():
 	var ez_center = far_goal_line + field_fwd * 4.75
-	ez_center.y = ground_y - 0.6
+	ez_center.y = ground_y - 2.6
 	var ez = MeshInstance3D.new()
 	var box = BoxMesh.new()
 	box.size = Vector3(50.0, 0.05, 9.5)
