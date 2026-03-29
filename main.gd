@@ -496,28 +496,27 @@ func _physics_process(delta):
 		camera.position = player.position + Vector3(cam_side, cam_height, cam_dist)
 		camera.look_at(player.position + Vector3(0, 1, 0), Vector3.UP)
 
-func _input(event):
+func _unhandled_key_input(event):
 	if game_phase != "active":
 		return
-	if not (event is InputEventKey and event.pressed and not event.echo):
+	if not event.pressed:
 		return
-	match event.keycode:
-		KEY_Z:
-			if stamina >= JUKE_COST:
-				player.position -= field_right * JUKE_DIST
-				stamina -= JUKE_COST
-				move_recovery_timer = 0.35
-		KEY_X:
-			if stamina >= JUKE_COST:
-				player.position += field_right * JUKE_DIST
-				stamina -= JUKE_COST
-				move_recovery_timer = 0.35
-		KEY_C:
-			if stamina >= SPIN_COST:
-				player.position -= field_fwd * SPIN_DIST
-				stamina -= SPIN_COST
-				spin_invincible_timer = 0.45
-				move_recovery_timer = 0.2
+	if event.is_echo():
+		return
+	var key = event.keycode
+	if key == KEY_Z and stamina >= JUKE_COST:
+		player.position -= field_right * JUKE_DIST
+		stamina -= JUKE_COST
+		move_recovery_timer = 0.35
+	elif key == KEY_X and stamina >= JUKE_COST:
+		player.position += field_right * JUKE_DIST
+		stamina -= JUKE_COST
+		move_recovery_timer = 0.35
+	elif key == KEY_C and stamina >= SPIN_COST:
+		player.position -= field_fwd * SPIN_DIST
+		stamina -= SPIN_COST
+		spin_invincible_timer = 0.45
+		move_recovery_timer = 0.2
 
 func _catch_ball():
 	game_phase = "active"
