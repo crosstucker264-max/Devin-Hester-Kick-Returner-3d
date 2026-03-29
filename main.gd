@@ -61,9 +61,19 @@ var coverage_speed = 7.0
 var blocker_data = []
 var blocker_speed = 6.5
 
+# Crowd
+var crowd_members = []
+var crowd_colors = [
+	Color(0.9, 0.1, 0.1),   # red
+	Color(0.1, 0.2, 0.8),   # blue
+	Color(0.95, 0.95, 0.95), # white
+	Color(0.1, 0.1, 0.1)    # black
+]
+
 func _ready():
 	_setup_field_vectors()
 	_load_stadium()
+	_create_crowd()
 	_create_player()
 	_create_other_players()
 	_create_ball_circle()
@@ -194,6 +204,64 @@ func _create_label():
 	try_again_btn.position.x -= 100
 	try_again_btn.pressed.connect(_on_try_again)
 	canvas.add_child(try_again_btn)
+
+func _create_crowd():
+	# Load the crowd model to use as a template for individual fans
+	var crowd_scene = load("res://crowd.glb")
+	if not crowd_scene:
+		print("ERROR: Could not load crowd file!")
+		return
+
+	# Stadium stand positions — fans placed along sidelines and end zones
+	# Using field_fwd and field_right to align with the diagonal field
+	var returner_pos = Vector3(-0.5, ground_y, 28)
+
+	# Side stands: run along the length of the field
+	# Left sideline stands
+	for row in range(4):
+		for i in range(30):
+			var dist_along = 5.0 + i * 3.0
+			var pos = returner_pos + field_fwd * dist_along - field_right * (28.0 + row * 2.5)
+			pos.y = ground_y + 2.0 + row * 1.8
+			_place_fan(pos, row)
+
+	# Right sideline stands
+	for row in range(4):
+		for i in range(30):
+			var dist_along = 5.0 + i * 3.0
+			var pos = returner_pos + field_fwd * dist_along + field_right * (28.0 + row * 2.5)
+			pos.y = ground_y + 2.0 + row * 1.8
+			_place_fan(pos, row)
+
+	# Near end zone stands (behind returner)
+	for row in range(3):
+		for i in range(15):
+			var side = (i - 7.0) * 3.5
+			var pos = returner_pos - field_fwd * (5.0 + row * 2.5) + field_right * side
+			pos.y = ground_y + 2.0 + row * 1.8
+			_place_fan(pos, row)
+
+	# Far end zone stands (behind scoring end zone)
+	for row in range(3):
+		for i in range(15):
+			var side = (i - 7.0) * 3.5
+			var pos = returner_pos + field_fwd * (92.0 + row * 2.5) + field_right * side
+			pos.y = ground_y + 2.0 + row * 1.8
+			_place_fan(pos, row)
+
+func _place_fan(pos, row):
+	var fan = MeshInstance3D.new()
+	var cap = CapsuleMesh.new()
+	cap.radius = 0.3
+	cap.height = 1.2
+	fan.mesh = cap
+	var mat = StandardMaterial3D.new()
+	mat.albedo_color = crowd_colors[randi() % crowd_colors.size()]
+	fan.material_override = mat
+	fan.position = pos
+	add_child(fan)
+	# Store for cheering animation with random offset so they don't all sync
+	crowd_members.append({"mesh": fan, "base_y": pos.y, "phase": randf() * TAU})
 
 func _load_stadium():
 	var stadium_scene = load("res://arabian_knights_football_stadium_arabal.glb")
@@ -495,9 +563,16 @@ func _physics_process(delta):
 		label.text = "Run to the BLUE end zone!\nShift=Sprint  Z=Juke Left  X=Juke Right  C=Spin"
 
 	elif game_phase == "touchdown" or game_phase == "tackled":
-		# Freeze everything — just hold the camera
 		camera.position = player.position + Vector3(cam_side, cam_height, cam_dist)
 		camera.look_at(player.position + Vector3(0, 1, 0), Vector3.UP)
+
+	# Crowd cheering animation — always active in all phases
+	var cheer_time = Time.get_ticks_msec() * 0.001
+	var cheer_intensity = 1.5 if game_phase == "touchdown" else 0.6
+	for c in crowd_members:
+		var m = c.mesh
+		var bob = sin(cheer_time * 4.0 + c.phase) * cheer_intensity
+		m.position.y = c.base_y + abs(bob) * 0.3
 
 func _unhandled_key_input(event):
 	if game_phase != "active":
